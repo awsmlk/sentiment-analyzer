@@ -1,0 +1,7 @@
+Time,Label,Confidence,Text
+Tue Mar 17 16:33:38 2026,neutral,51.7452,I want to kill you
+Tue Mar 17 16:33:56 2026,positive,97.5778,i am happy
+Tue Mar 17 16:34:13 2026,negative,94.5441,i am sad
+Tue Mar 17 16:35:13 2026,negative,98.8966,i am not happy
+Tue Mar 17 16:35:31 2026,positive,95.0756,i am not sad
+Tue Mar 17 16:35:45 2026,negative,94.5441,i am sad

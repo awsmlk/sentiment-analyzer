@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run C++ (lldb)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/program",
+      "args": [],
+      "cwd": "${fileDirname}",
+      "MIMode": "lldb",
+      "preLaunchTask": "C++: build project",
+      "externalConsole": true,
+      "stopAtEntry": false
+    },
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/malik/Desktop/sen-analyzer",
+      "program": "/Users/malik/Desktop/sen-analyzer/build/Debug/outDebug"
+    }
+  ]
+}
