@@ -3,23 +3,50 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 #include <map>
 
-struct HistoryRow {
-    std::string time;
-    std::string label;
+using namespace std;
+
+// ─────────────────────────────────────────────────────────────
+// Structs
+// ─────────────────────────────────────────────────────────────
+
+struct KeywordScore {
+    string word;
     double score;
-    std::string text;
+    string polarity; // "pos", "neg", "neu"
 };
 
-void trainModel(const std::string& filename);
+struct PredictResult {
+    string label;
+    double confidence;
+    bool isUnknown;
+    double oovRatio;
+    vector<KeywordScore> keywords;
+};
 
-std::pair<std::string,double> predict(const std::string& text);
+struct HistoryRow {
+    string time;
+    string label;
+    double score;
+    string text;
+};
 
-std::vector<HistoryRow>& getHistory();
+// ─────────────────────────────────────────────────────────────
+// Core API
+// ─────────────────────────────────────────────────────────────
 
-void exportHistory(const std::string& path);
+void trainModel(const string &filename);
+double testAccuracy(const string &filename);
 
-double testAccuracy(const std::string& filename);
+pair<string,double> predict(const string &text);
+PredictResult predictFull(const string &text);
+
+vector<HistoryRow>& getHistory();
+
+size_t getVocabSize();
+
+void exportHistory(const string &path);
 
 #endif

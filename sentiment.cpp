@@ -1,231 +1,511 @@
-#include "sentiment.h"
-#include "ui.h"
-#include <iostream>
-#include <fstream>
-#include <sstream>
+#include "sentiment_system.h"
+
 #include <algorithm>
-#include <ctime>
-#include <cmath>
 #include <cctype>
-#include <unordered_set>
+#include <cmath>
+#include <ctime>
+#include <fstream>
+#include <iostream>
+#include <sstream>
 
 using namespace std;
 
-map<string, map<string, int>> wordCounts;
-map<string, int> labelCounts;
-map<string, int> totalWords;
-map<string, double> priors;
+/*
+    The class declarations live in separate .h files so each part of the
+    sentiment engine is easier to find. The implementations stay here so the
+    build command can remain simple:
 
-unordered_set<string> vocabulary;
-vector<HistoryRow> history;
+        g++ -std=c++17 -O2 -o server server.cpp sentiment.cpp -pthread
+*/
 
-// ----------------- Helpers -----------------
-string lower(string s)
+TrainingExample::TrainingExample() {}
+
+TrainingExample::TrainingExample(const string &textValue, const string &labelValue)
 {
-    transform(s.begin(), s.end(), s.begin(), ::tolower);
-    return s;
+    text = textValue;
+    label = labelValue;
 }
 
-string removePunctuation(string s)
+TrainingExample CsvLineReader::parseLine(const string &line) const
 {
-    s.erase(remove_if(s.begin(), s.end(),
-                      [](unsigned char c) { return ispunct(c); }),
-            s.end());
-    return s;
+    string text;
+    string label;
+
+    if (line.empty()) return TrainingExample();
+
+    // If the text starts with a quote, it may contain commas.
+    if (line[0] == '"')
+    {
+        size_t closeQuote = line.find('"', 1);
+        if (closeQuote != string::npos)
+        {
+            text = line.substr(1, closeQuote - 1);
+            size_t labelStart = closeQuote + 2;
+            if (labelStart < line.size())
+                label = line.substr(labelStart);
+        }
+    }
+    else
+    {
+        stringstream ss(line);
+        getline(ss, text, ',');
+        getline(ss, label, ',');
+    }
+
+    return TrainingExample(text, label);
 }
 
-string normalize(string s)
+string LabelHelper::clean(string label) const
 {
-    if (s == "im") return "i";
-    if (s == "ive") return "i";
-    if (s == "dont") return "not";
-    if (s == "cant") return "not";
-    return s;
+    transform(label.begin(), label.end(), label.begin(),
+              [](unsigned char c) { return static_cast<char>(tolower(c)); });
+
+    while (!label.empty() && (label.back() == '\r' || label.back() == ' '))
+        label.pop_back();
+
+    while (!label.empty() && label.front() == ' ')
+        label.erase(label.begin());
+
+    return label;
 }
 
-// ----------------- Tokenizer with Negation + Bigrams -----------------
-vector<string> tokenize(string text)
+bool LabelHelper::isValid(const string &label) const
+{
+    return label == "positive" || label == "neutral" || label == "negative";
+}
+
+string WordCleaner::toLower(string word) const
+{
+    transform(word.begin(), word.end(), word.begin(),
+              [](unsigned char c) { return static_cast<char>(tolower(c)); });
+    return word;
+}
+
+string WordCleaner::removePunctuation(string word) const
+{
+    word.erase(remove_if(word.begin(), word.end(),
+                         [](unsigned char c) { return ispunct(c); }),
+               word.end());
+    return word;
+}
+
+string WordCleaner::normalize(const string &word) const
+{
+    if (word == "im") return "i";
+    if (word == "ive") return "i";
+    if (word == "dont") return "not";
+    if (word == "cant") return "not";
+    if (word == "isnt") return "not";
+    if (word == "wasnt") return "not";
+    if (word == "wont") return "not";
+    return word;
+}
+
+string WordCleaner::clean(string word) const
+{
+    word = toLower(word);
+    word = removePunctuation(word);
+    word = normalize(word);
+    return word;
+}
+
+vector<string> Tokenizer::tokenize(const string &text) const
 {
     vector<string> words;
-    string prev = "";
-    string word;
+    string previousWord;
+    string currentWord;
     stringstream ss(text);
 
-    while(ss >> word)
+    while (ss >> currentWord)
     {
-        word = lower(word);
-        word = normalize(word);
-        word = removePunctuation(word);
-        if(word.empty()) continue;
+        currentWord = cleaner.clean(currentWord);
+        if (currentWord.empty()) continue;
 
-        // Handle negation "not X"
-        if(prev == "not")
+        // Convert "not good" into one stronger token: "not_good".
+        if (previousWord == "not")
         {
-            words.pop_back();          // remove the "not" token
-            word = "not_" + word;      // combine
+            words.pop_back();
+            currentWord = "not_" + currentWord;
         }
 
-        // Add bigram with previous word if exists
-        if(!prev.empty())
-            words.push_back(prev + "_" + word);
+        // Also store simple word pairs, like "very_good".
+        if (!previousWord.empty() && previousWord != "not")
+            words.push_back(previousWord + "_" + currentWord);
 
-        words.push_back(word);
-
-        prev = word; // Update prev AFTER processing
+        words.push_back(currentWord);
+        previousWord = currentWord;
     }
 
     return words;
 }
-// ----------------- Training -----------------
-void trainModel(const string &filename)
+
+void SentimentModel::clear()
 {
     wordCounts.clear();
     labelCounts.clear();
     totalWords.clear();
     priors.clear();
     vocabulary.clear();
+}
+
+void SentimentModel::learnFromTokens(const string &label, const vector<string> &tokens)
+{
+    labelCounts[label]++;
+
+    for (const string &word : tokens)
+    {
+        wordCounts[label][word]++;
+        totalWords[label]++;
+        vocabulary.insert(word);
+    }
+}
+
+void SentimentModel::calculatePriors()
+{
+    int totalDocuments = 0;
+    for (const auto &item : labelCounts)
+        totalDocuments += item.second;
+
+    if (totalDocuments == 0) return;
+
+    for (const auto &item : labelCounts)
+        priors[item.first] = static_cast<double>(item.second) / totalDocuments;
+}
+
+bool SentimentModel::isTrained() const
+{
+    return !priors.empty();
+}
+
+size_t SentimentModel::vocabSize() const
+{
+    return vocabulary.size();
+}
+
+int SentimentModel::countWord(const string &label, const string &word) const
+{
+    auto labelIt = wordCounts.find(label);
+    if (labelIt == wordCounts.end()) return 0;
+
+    auto wordIt = labelIt->second.find(word);
+    if (wordIt == labelIt->second.end()) return 0;
+
+    return wordIt->second;
+}
+
+int SentimentModel::totalForLabel(const string &label) const
+{
+    auto it = totalWords.find(label);
+    return (it == totalWords.end()) ? 0 : it->second;
+}
+
+TrainingReport ModelTrainer::train(SentimentModel &model, const string &filename) const
+{
+    TrainingReport report;
+    model.clear();
 
     ifstream file(filename);
     if (!file.is_open())
     {
-        cout << "Error: Could not open dataset file\n";
-        return;
+        cout << "Error: Could not open dataset file: " << filename << "\n";
+        return report;
     }
 
     string line;
-    getline(file, line); // skip header
+    getline(file, line); // skip CSV header
 
     while (getline(file, line))
     {
-        string text, label;
-        stringstream ss(line);
-        getline(ss, text, ',');
-        getline(ss, label, ',');
-        label = lower(label);
+        TrainingExample example = csvReader.parseLine(line);
+        example.label = labelHelper.clean(example.label);
 
-        labelCounts[label]++;
-        auto tokens = tokenize(text);
+        if (!labelHelper.isValid(example.label)) continue;
 
-        for (auto &w : tokens)
+        vector<string> tokens = tokenizer.tokenize(example.text);
+        model.learnFromTokens(example.label, tokens);
+        report.rowsUsed++;
+    }
+
+    model.calculatePriors();
+    return report;
+}
+
+double OovChecker::calculateRatio(const SentimentModel &model, const vector<string> &words) const
+{
+    int unknownWords = 0;
+    int normalWords = 0;
+
+    for (const string &word : words)
+    {
+        // Words with "_" are generated by our tokenizer, so skip them here.
+        if (word.find('_') != string::npos) continue;
+
+        normalWords++;
+        if (model.vocabulary.find(word) == model.vocabulary.end())
+            unknownWords++;
+    }
+
+    if (normalWords == 0) return 0.0;
+    return static_cast<double>(unknownWords) / normalWords;
+}
+
+void ScoreBoard::addScore(const string &label, double score)
+{
+    logScores[label] = score;
+}
+
+string ScoreBoard::bestLabel() const
+{
+    string best = "neutral";
+    double bestScore = -1e18;
+
+    for (const auto &item : logScores)
+    {
+        if (item.second > bestScore)
         {
-            wordCounts[label][w]++;
-            totalWords[label]++;
-            vocabulary.insert(w);
+            bestScore = item.second;
+            best = item.first;
         }
     }
 
-    int docs = 0;
-    for (auto &p : labelCounts) docs += p.second;
-    for (auto &p : labelCounts) priors[p.first] = (double)p.second / docs;
+    return best;
 }
 
-// ----------------- Internal Prediction -----------------
-pair<string,double> predictInternal(const string &text, bool logHistory)
+double ScoreBoard::bestScore() const
 {
-    if (priors.empty()) return {"Model not trained", 0};
+    double best = -1e18;
+    for (const auto &item : logScores)
+        best = max(best, item.second);
+    return best;
+}
 
-    auto words = tokenize(text);
+double ScoreBoard::confidence() const
+{
+    double best = bestScore();
+    double sum = 0.0;
 
-    string bestLabel;
-    double bestScore = -1e9;
-    map<string,double> logScores;
+    for (const auto &item : logScores)
+        sum += exp(item.second - best);
 
-    for(auto &p : priors)
+    if (sum <= 0.0) return 50.0;
+    return (1.0 / sum) * 100.0;
+}
+
+ScoreBoard BayesPredictor::scoreText(const SentimentModel &model, const vector<string> &words) const
+{
+    ScoreBoard scores;
+    size_t vocabSize = max(static_cast<size_t>(1), model.vocabSize());
+
+    for (const auto &prior : model.priors)
     {
-        string label = p.first;
-        double score = log(p.second);
+        string label = prior.first;
+        double score = log(prior.second);
 
-        for(auto &w : words)
+        for (const string &word : words)
         {
-            int count = wordCounts[label][w];
-            double prob = (count + 1.0) / (totalWords[label] + max((size_t)1, vocabulary.size()));
-            score += log(prob);
+            int count = model.countWord(label, word);
+            double total = static_cast<double>(model.totalForLabel(label)) + vocabSize;
+            double probability = (count + 1.0) / total;
+            score += log(probability);
         }
 
-        logScores[label] = score;
-        if(score > bestScore)
-        {
-            bestScore = score;
-            bestLabel = label;
-        }
+        scores.addScore(label, score);
     }
 
-    // Log-sum-exp trick
-    double maxScore = bestScore;
-    double sumExp = 0;
-    for(auto &p : logScores) sumExp += exp(p.second - maxScore);
-
-    double confidence = 0;
-    if(sumExp > 0) confidence = (1.0 / sumExp) * 100;
-
-    // -------- Neutral fallback --------
-    const double NEUTRAL_THRESHOLD = 40.0; // confidence below this → neutral
-    if(confidence < NEUTRAL_THRESHOLD)
-    {
-        bestLabel = "neutral";
-        confidence = 100.0; // or leave confidence as-is
-    }
-
-    if(logHistory)
-    {
-        time_t now = time(0);
-        string t = ctime(&now);
-        t.pop_back();
-
-        HistoryRow row;
-        row.time = t;
-        row.label = bestLabel;
-        row.score = confidence;
-        row.text = text;
-
-        history.push_back(row);
-    }
-
-    return {bestLabel, confidence};
+    return scores;
 }
 
-// ----------------- Public Prediction -----------------
-pair<string,double> predict(const string &text)
+vector<KeywordScore> KeywordFinder::findKeywords(const SentimentModel &model,
+                                                 const vector<string> &words) const
 {
-    return predictInternal(text, true);
-}
+    vector<KeywordScore> keywords;
+    map<string, double> polarityScores;
+    size_t vocabSize = max(static_cast<size_t>(1), model.vocabSize());
 
-// ----------------- History -----------------
-vector<HistoryRow> &getHistory() { return history; }
+    double positiveTotal = static_cast<double>(model.totalForLabel("positive")) + vocabSize;
+    double negativeTotal = static_cast<double>(model.totalForLabel("negative")) + vocabSize;
 
-void exportHistory(const string &path)
-{
-    ofstream file(path);
-    file << "Time,Label,Confidence,Text\n";
-    for (auto &h : history)
+    for (const string &word : words)
     {
-        file << h.time << "," << h.label << "," << h.score << "," << h.text << "\n";
+        if (word.find('_') != string::npos) continue;
+
+        double positiveScore = log((model.countWord("positive", word) + 1.0) / positiveTotal);
+        double negativeScore = log((model.countWord("negative", word) + 1.0) / negativeTotal);
+        polarityScores[word] = positiveScore - negativeScore;
     }
+
+    vector<pair<string, double>> sorted(polarityScores.begin(), polarityScores.end());
+    sort(sorted.begin(), sorted.end(), [](const auto &a, const auto &b) {
+        return abs(a.second) > abs(b.second);
+    });
+
+    for (size_t i = 0; i < min(static_cast<size_t>(6), sorted.size()); i++)
+    {
+        KeywordScore keyword;
+        keyword.word = sorted[i].first;
+        keyword.score = sorted[i].second;
+        keyword.polarity = (keyword.score > 0.5) ? "pos"
+                         : (keyword.score < -0.5) ? "neg"
+                         : "neu";
+        keywords.push_back(keyword);
+    }
+
+    return keywords;
 }
 
-// ----------------- Accuracy Testing -----------------
-double testAccuracy(const string &filename)
+void HistoryManager::add(const string &text, const string &label, double confidence)
+{
+    time_t now = time(nullptr);
+    string timestamp = ctime(&now);
+    if (!timestamp.empty()) timestamp.pop_back();
+
+    HistoryRow row;
+    row.time = timestamp;
+    row.label = label;
+    row.score = confidence;
+    row.text = text;
+    rows.push_back(row);
+}
+
+vector<HistoryRow>& HistoryManager::getRows()
+{
+    return rows;
+}
+
+double AccuracyTester::test(const string &filename, SentimentSystem &system) const
 {
     ifstream file(filename);
-    if (!file.is_open()) return 0;
+    if (!file.is_open()) return 0.0;
 
     string line;
-    getline(file, line); // skip header
-    int correct = 0, total = 0;
+    getline(file, line); // skip CSV header
+
+    int correct = 0;
+    int total = 0;
 
     while (getline(file, line))
     {
-        string text, label;
-        stringstream ss(line);
-        getline(ss, text, ',');
-        getline(ss, label, ',');
-        label = lower(label);
+        TrainingExample example = csvReader.parseLine(line);
+        example.label = labelHelper.clean(example.label);
 
-        auto result = predictInternal(text, false);
-        if(result.first == label) correct++;
+        if (!labelHelper.isValid(example.label)) continue;
+
+        PredictResult result = system.predictFull(example.text, false);
+        if (result.label == example.label)
+            correct++;
+
         total++;
     }
 
-    if(total == 0) return 0;
-    return (double)correct / total * 100;
+    if (total == 0) return 0.0;
+    return static_cast<double>(correct) / total * 100.0;
+}
+
+void HistoryExporter::exportToCsv(const string &path, const vector<HistoryRow> &rows) const
+{
+    ofstream file(path);
+    file << "Time,Label,Confidence,Text\n";
+
+    for (const HistoryRow &row : rows)
+        file << row.time << "," << row.label << "," << row.score << "," << row.text << "\n";
+}
+
+void SentimentSystem::train(const string &filename)
+{
+    TrainingReport report = trainer.train(model, filename);
+    cout << "[sentiment] Trained on " << report.rowsUsed
+         << " rows | vocab=" << model.vocabSize() << "\n";
+}
+
+PredictResult SentimentSystem::predictFull(const string &text, bool saveToHistory)
+{
+    PredictResult result;
+    result.label = "neutral";
+    result.confidence = 50.0;
+    result.isUnknown = false;
+    result.oovRatio = 0.0;
+
+    if (!model.isTrained())
+    {
+        result.label = "Model not trained";
+        return result;
+    }
+
+    vector<string> words = tokenizer.tokenize(text);
+    if (words.empty()) return result;
+
+    result.oovRatio = oovChecker.calculateRatio(model, words);
+
+    ScoreBoard scores = predictor.scoreText(model, words);
+    result.label = scores.bestLabel();
+    result.confidence = scores.confidence();
+
+    if (result.confidence < 40.0)
+        result.label = "neutral";
+
+    result.keywords = keywordFinder.findKeywords(model, words);
+    result.isUnknown = (result.oovRatio > 0.6 && result.confidence < 70.0);
+
+    if (saveToHistory)
+        history.add(text, result.label, result.confidence);
+
+    return result;
+}
+
+double SentimentSystem::testAccuracy(const string &filename)
+{
+    return accuracyTester.test(filename, *this);
+}
+
+vector<HistoryRow>& SentimentSystem::getHistory()
+{
+    return history.getRows();
+}
+
+size_t SentimentSystem::getVocabSize() const
+{
+    return model.vocabSize();
+}
+
+void SentimentSystem::exportHistory(const string &path)
+{
+    historyExporter.exportToCsv(path, history.getRows());
+}
+
+static SentimentSystem sentimentSystem;
+
+void trainModel(const string &filename)
+{
+    sentimentSystem.train(filename);
+}
+
+double testAccuracy(const string &filename)
+{
+    return sentimentSystem.testAccuracy(filename);
+}
+
+pair<string, double> predict(const string &text)
+{
+    PredictResult result = sentimentSystem.predictFull(text, true);
+    return {result.label, result.confidence};
+}
+
+PredictResult predictFull(const string &text)
+{
+    return sentimentSystem.predictFull(text, true);
+}
+
+vector<HistoryRow>& getHistory()
+{
+    return sentimentSystem.getHistory();
+}
+
+size_t getVocabSize()
+{
+    return sentimentSystem.getVocabSize();
+}
+
+void exportHistory(const string &path)
+{
+    sentimentSystem.exportHistory(path);
 }

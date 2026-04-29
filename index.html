@@ -1,0 +1,2395 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sentiment Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        :root {
+            --bg: #080b10;
+            --surf: #0e1219;
+            --surf2: #141820;
+            --border: #1c2230;
+            --border2: #242d3e;
+            --accent: #9f6cff;
+            --accent2: #ff6b6b;
+            --pos: #4ade80;
+            --neu: #fbbf24;
+            --neg: #f87171;
+            --text: #dce8f5;
+            --muted: #4a5568;
+            --muted2: #2d3748;
+            --mono: 'Space Mono', monospace;
+            --ui: 'Bricolage Grotesque', sans-serif;
+            --r: 8px;
+        }
+
+        html,
+        body {
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--ui);
+            overflow-x: hidden
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.025) 2px, rgba(0, 0, 0, 0.025) 4px)
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border2);
+            border-radius: 4px
+        }
+
+        /* LAYOUT */
+        .shell {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            grid-template-rows: 56px 1fr;
+            height: 100vh;
+            overflow: hidden
+        }
+
+        /* TOPBAR */
+        .topbar {
+            grid-column: 1/-1;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(8, 11, 16, .92);
+            backdrop-filter: blur(16px);
+            z-index: 20
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 15px;
+            letter-spacing: -.03em
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: var(--accent);
+            display: grid;
+            place-items: center;
+            color: #080b10;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            box-shadow: 0 0 16px rgba(90, 242, 200, .35)
+        }
+
+        .logo em {
+            color: var(--accent);
+            font-style: normal
+        }
+
+        .divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+            margin: 0 4px
+        }
+
+        .engine-toggle {
+            display: flex;
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            overflow: hidden
+        }
+
+        .eng-btn {
+            padding: 5px 12px;
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: .04em;
+            transition: all .15s
+        }
+
+        .eng-btn.active {
+            background: var(--accent);
+            color: #080b10;
+            font-weight: 700
+        }
+
+        .topbar-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 100px;
+            border: 1px solid var(--border2);
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted)
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            border-right: 1px solid var(--border);
+            background: var(--surf);
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+            overflow-y: auto
+        }
+
+        .nav-grp {
+            padding: 0 14px 20px
+        }
+
+        .nav-grp-label {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: .18em;
+            text-transform: uppercase;
+            color: var(--muted);
+            padding: 0 6px;
+            margin-bottom: 8px
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 9px 10px;
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: var(--muted);
+            font-family: var(--ui);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            transition: all .15s;
+            margin-bottom: 2px
+        }
+
+        .nav-item:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, .03);
+            border-color: var(--border)
+        }
+
+        .nav-item.active {
+            color: var(--accent);
+            background: rgba(90, 242, 200, .07);
+            border-color: rgba(90, 242, 200, .2)
+        }
+
+        .nav-item .ni {
+            font-size: 15px;
+            width: 18px;
+            text-align: center
+        }
+
+        .tq-badge {
+            margin-left: auto;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            background: var(--accent2);
+            color: #fff;
+            border-radius: 100px;
+            font-size: 9px;
+            font-family: var(--mono);
+            font-weight: 700;
+            display: none;
+            place-items: center
+        }
+
+        .tq-badge.show {
+            display: grid
+        }
+
+        .sidebar-stats {
+            margin: 0 14px;
+            padding: 14px;
+            background: rgba(90, 242, 200, .04);
+            border: 1px solid rgba(90, 242, 200, .1);
+            border-radius: var(--r)
+        }
+
+        .sidebar-stats p {
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--muted);
+            letter-spacing: .1em;
+            margin-bottom: 10px
+        }
+
+        .sstat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 7px
+        }
+
+        .sstat:last-child {
+            margin: 0
+        }
+
+        .sstat-l {
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        .sstat-v {
+            font-family: var(--mono);
+            font-size: 13px;
+            font-weight: 700
+        }
+
+        .sstat-v.pos {
+            color: var(--pos)
+        }
+
+        .sstat-v.neu {
+            color: var(--neu)
+        }
+
+        .sstat-v.neg {
+            color: var(--neg)
+        }
+
+        /* MAIN */
+        .main {
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column
+        }
+
+        .panel {
+            display: none;
+            flex-direction: column;
+            gap: 0;
+            padding: 28px 32px;
+            flex: 1;
+            animation: fadeUp .22s ease
+        }
+
+        .panel.active {
+            display: flex
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .panel-head {
+            margin-bottom: 22px
+        }
+
+        .panel-head h2 {
+            font-size: 23px;
+            font-weight: 800;
+            letter-spacing: -.04em
+        }
+
+        .panel-head h2 em {
+            color: var(--accent);
+            font-style: normal
+        }
+
+        .panel-head p {
+            font-size: 13px;
+            color: var(--muted);
+            margin-top: 4px
+        }
+
+        /* ANALYZE GRID */
+        .analyze-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 20px;
+            flex: 1;
+            min-height: 0
+        }
+
+        .analyze-left {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            overflow-y: auto
+        }
+
+        .analyze-right {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            overflow-y: auto
+        }
+
+        /* TERM BOX */
+        .term-box {
+            background: var(--surf);
+            border: 1px solid var(--border2);
+            border-radius: var(--r);
+            overflow: hidden;
+            transition: border-color .2s, box-shadow .2s
+        }
+
+        .term-box:focus-within {
+            border-color: rgba(90, 242, 200, .4);
+            box-shadow: 0 0 0 3px rgba(90, 242, 200, .06)
+        }
+
+        .term-top {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, .02)
+        }
+
+        .tc {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%
+        }
+
+        .tc.r {
+            background: #ff5f57
+        }
+
+        .tc.y {
+            background: #febc2e
+        }
+
+        .tc.g {
+            background: #28c840
+        }
+
+        .term-top span {
+            margin-left: 6px;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted)
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 130px;
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 16px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 13px;
+            line-height: 1.75;
+            resize: vertical;
+            caret-color: var(--accent)
+        }
+
+        textarea::placeholder {
+            color: var(--muted)
+        }
+
+        .term-foot {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-top: 1px solid var(--border)
+        }
+
+        .char-count {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted)
+        }
+
+        /* BUTTONS */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-family: var(--ui);
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .18s
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 7px
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #080b10
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 18px rgba(90, 242, 200, .25)
+        }
+
+        .btn-primary:active {
+            transform: none
+        }
+
+        .btn-primary:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--border2);
+            color: var(--muted)
+        }
+
+        .btn-ghost:hover {
+            border-color: var(--border2);
+            color: var(--text);
+            background: var(--surf2)
+        }
+
+        .btn-danger {
+            background: rgba(255, 107, 107, .1);
+            border: 1px solid rgba(255, 107, 107, .2);
+            color: var(--accent2)
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 107, 107, .2)
+        }
+
+        .btn-sm {
+            padding: 5px 11px;
+            font-size: 11px
+        }
+
+        /* RESULT CARD */
+        .result-card {
+            background: var(--surf);
+            border: 1px solid var(--border2);
+            border-radius: var(--r);
+            overflow: hidden;
+            display: none
+        }
+
+        .result-card.show {
+            display: block;
+            animation: fadeUp .25s ease
+        }
+
+        .rc-top {
+            padding: 16px 20px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: flex-start;
+            gap: 14px
+        }
+
+        .rc-label {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 6px
+        }
+
+        .sent-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 14px;
+            border-radius: 100px;
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em
+        }
+
+        .sent-badge.positive {
+            background: rgba(74, 222, 128, .12);
+            color: var(--pos);
+            border: 1px solid rgba(74, 222, 128, .25)
+        }
+
+        .sent-badge.neutral {
+            background: rgba(251, 191, 36, .12);
+            color: var(--neu);
+            border: 1px solid rgba(251, 191, 36, .25)
+        }
+
+        .sent-badge.negative {
+            background: rgba(248, 113, 113, .12);
+            color: var(--neg);
+            border: 1px solid rgba(248, 113, 113, .25)
+        }
+
+        .sent-badge.uncertain {
+            background: rgba(255, 107, 107, .1);
+            color: var(--accent2);
+            border: 1px solid rgba(255, 107, 107, .2)
+        }
+
+        .rc-conf {
+            margin-left: auto;
+            text-align: right
+        }
+
+        .conf-big {
+            font-family: var(--mono);
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--text)
+        }
+
+        .conf-lbl {
+            font-size: 10px;
+            color: var(--muted);
+            font-family: var(--mono)
+        }
+
+        .conf-bar-wrap {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .bar-meta {
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--muted);
+            margin-bottom: 7px
+        }
+
+        .bar-track {
+            height: 5px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width .7s cubic-bezier(.16, 1, .3, 1);
+            width: 0
+        }
+
+        .bar-fill.positive {
+            background: var(--pos);
+            box-shadow: 0 0 10px rgba(74, 222, 128, .4)
+        }
+
+        .bar-fill.neutral {
+            background: var(--neu)
+        }
+
+        .bar-fill.negative {
+            background: var(--neg);
+            box-shadow: 0 0 10px rgba(248, 113, 113, .4)
+        }
+
+        .bar-fill.uncertain {
+            background: var(--accent2)
+        }
+
+        /* KEYWORDS */
+        .kw-section {
+            padding: 11px 20px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .kw-lbl {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 7px
+        }
+
+        .kw-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px
+        }
+
+        .kw-chip {
+            padding: 3px 9px;
+            border-radius: 100px;
+            font-family: var(--mono);
+            font-size: 10px
+        }
+
+        .kw-chip.pos {
+            background: rgba(74, 222, 128, .1);
+            color: var(--pos)
+        }
+
+        .kw-chip.neg {
+            background: rgba(248, 113, 113, .1);
+            color: var(--neg)
+        }
+
+        .kw-chip.neu {
+            background: rgba(251, 191, 36, .08);
+            color: var(--neu)
+        }
+
+        /* REASONING (ollama) */
+        .reasoning-section {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            line-height: 1.6;
+            display: none
+        }
+
+        .reasoning-section.show {
+            display: block
+        }
+
+        /* TEACH PROMPT */
+        .teach-prompt {
+            padding: 14px 20px;
+            background: rgba(255, 107, 107, .05);
+            border-top: 1px solid rgba(255, 107, 107, .15);
+            display: none
+        }
+
+        .teach-prompt.show {
+            display: block
+        }
+
+        .teach-q {
+            font-size: 12px;
+            color: var(--accent2);
+            font-weight: 600;
+            margin-bottom: 10px
+        }
+
+        .teach-options {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 10px
+        }
+
+        .teach-opt {
+            padding: 5px 12px;
+            border-radius: 100px;
+            border: 1px solid var(--border2);
+            background: transparent;
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all .15s
+        }
+
+        .teach-opt:hover {
+            border-color: var(--accent);
+            color: var(--accent)
+        }
+
+        .teach-opt.pos-sel {
+            background: var(--pos) !important;
+            color: #080b10 !important;
+            border-color: var(--pos) !important
+        }
+
+        .teach-opt.neu-sel {
+            background: var(--neu) !important;
+            color: #080b10 !important;
+            border-color: var(--neu) !important
+        }
+
+        .teach-opt.neg-sel {
+            background: var(--neg) !important;
+            color: #fff !important;
+            border-color: var(--neg) !important
+        }
+
+        .teach-save-row {
+            display: flex;
+            gap: 8px;
+            align-items: center
+        }
+
+        .teach-note {
+            font-size: 10px;
+            color: var(--muted);
+            font-family: var(--mono)
+        }
+
+        /* MODEL CARD */
+        .model-card {
+            background: var(--surf);
+            border: 1px solid var(--border2);
+            border-radius: var(--r);
+            padding: 16px
+        }
+
+        .model-card h3 {
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .model-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: var(--mono);
+            font-size: 9px;
+            background: rgba(90, 242, 200, .1);
+            color: var(--accent);
+            border: 1px solid rgba(90, 242, 200, .2)
+        }
+
+        .model-badge.ollama-b {
+            background: rgba(251, 191, 36, .1);
+            color: var(--neu);
+            border-color: rgba(251, 191, 36, .2)
+        }
+
+        .model-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px
+        }
+
+        .model-row:last-child {
+            margin: 0
+        }
+
+        .model-k {
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        .model-v {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text);
+            font-weight: 700
+        }
+
+        .ollama-picker {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+            display: none
+        }
+
+        .ollama-picker.show {
+            display: block
+        }
+
+        .ollama-picker label {
+            font-size: 10px;
+            color: var(--muted);
+            display: block;
+            margin-bottom: 5px;
+            font-family: var(--mono)
+        }
+
+        .ollama-picker select {
+            width: 100%;
+            padding: 7px 10px;
+            background: var(--surf2);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 12px;
+            outline: none
+        }
+
+        .ollama-picker select:focus {
+            border-color: var(--accent)
+        }
+
+        .model-actions {
+            display: flex;
+            gap: 7px;
+            flex-wrap: wrap;
+            margin-top: 12px
+        }
+
+        /* BATCH */
+        .batch-result {
+            background: var(--surf);
+            border: 1px solid var(--border2);
+            border-radius: var(--r);
+            overflow: hidden;
+            display: none
+        }
+
+        .batch-result.show {
+            display: block
+        }
+
+        .batch-head {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between
+        }
+
+        .batch-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 11px
+        }
+
+        .batch-row:hover {
+            background: rgba(255, 255, 255, .02)
+        }
+
+        .batch-row:last-child {
+            border: none
+        }
+
+        .batch-text {
+            flex: 1;
+            color: var(--muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: var(--mono)
+        }
+
+        .batch-conf {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            white-space: nowrap
+        }
+
+        .batch-teach-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 107, 107, .2);
+            border-radius: 100px;
+            color: var(--accent2);
+            font-size: 9px;
+            font-family: var(--mono);
+            padding: 2px 8px;
+            cursor: pointer;
+            transition: all .15s
+        }
+
+        .batch-teach-btn:hover {
+            background: rgba(255, 107, 107, .1)
+        }
+
+        /* BADGE */
+        .bs {
+            padding: 3px 9px;
+            border-radius: 100px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            font-family: var(--mono)
+        }
+
+        .bs.positive {
+            background: rgba(74, 222, 128, .1);
+            color: var(--pos)
+        }
+
+        .bs.neutral {
+            background: rgba(251, 191, 36, .1);
+            color: var(--neu)
+        }
+
+        .bs.negative {
+            background: rgba(248, 113, 113, .1);
+            color: var(--neg)
+        }
+
+        .bs.uncertain {
+            background: rgba(255, 107, 107, .1);
+            color: var(--accent2)
+        }
+
+        /* TEACH QUEUE */
+        .tq-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            align-items: center
+        }
+
+        .tq-empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: 12px
+        }
+
+        .tq-empty .big {
+            font-size: 36px;
+            margin-bottom: 12px;
+            opacity: .4
+        }
+
+        .tq-card {
+            background: var(--surf);
+            border: 1px solid var(--border2);
+            border-radius: var(--r);
+            margin-bottom: 10px;
+            overflow: hidden
+        }
+
+        .tq-card-top {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px
+        }
+
+        .tq-text {
+            font-size: 13px;
+            color: var(--text);
+            flex: 1;
+            line-height: 1.5
+        }
+
+        .tq-meta {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            white-space: nowrap;
+            padding-top: 2px
+        }
+
+        .tq-card-foot {
+            padding: 11px 18px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(255, 107, 107, .025)
+        }
+
+        .tq-card-foot>span {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: var(--mono);
+            margin-right: 4px
+        }
+
+        /* HISTORY */
+        .hist-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px
+        }
+
+        .search-box {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surf);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            padding: 7px 12px
+        }
+
+        .search-box input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 12px
+        }
+
+        .search-box input::placeholder {
+            color: var(--muted)
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 5px
+        }
+
+        .filter-chip {
+            padding: 5px 12px;
+            border-radius: 100px;
+            border: 1px solid var(--border2);
+            background: transparent;
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: 10px;
+            cursor: pointer;
+            transition: all .15s
+        }
+
+        .filter-chip.active {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(90, 242, 200, .07)
+        }
+
+        .hist-table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--border2);
+            border-radius: var(--r);
+            background: var(--surf)
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--mono);
+            font-size: 11px
+        }
+
+        th {
+            text-align: left;
+            padding: 9px 14px;
+            font-size: 9px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            border-bottom: 1px solid var(--border);
+            background: var(--surf2);
+            white-space: nowrap;
+            position: sticky;
+            top: 0
+        }
+
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(28, 34, 48, .7);
+            vertical-align: middle;
+            color: var(--text)
+        }
+
+        tr:last-child td {
+            border: none
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, .015)
+        }
+
+        .text-clip {
+            max-width: 280px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--muted)
+        }
+
+        .muted-cell {
+            color: var(--muted)
+        }
+
+        /* EXPORT */
+        .export-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px
+        }
+
+        .export-card {
+            background: var(--surf);
+            border: 1px solid var(--border2);
+            border-radius: var(--r);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px
+        }
+
+        .export-card h3 {
+            font-size: 14px;
+            font-weight: 700
+        }
+
+        .export-card p {
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.6;
+            flex: 1
+        }
+
+        .donut-wrap {
+            display: flex;
+            align-items: center;
+            gap: 24px
+        }
+
+        svg.donut {
+            transform: rotate(-90deg)
+        }
+
+        circle.dt {
+            fill: none;
+            stroke: var(--border);
+            stroke-width: 7
+        }
+
+        circle.ds {
+            fill: none;
+            stroke-width: 7;
+            stroke-linecap: round;
+            transition: stroke-dasharray .6s ease
+        }
+
+        .leg-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 8px
+        }
+
+        .leg-item:last-child {
+            margin: 0
+        }
+
+        .leg-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0
+        }
+
+        /* SETTINGS */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px
+        }
+
+        .setting-card {
+            background: var(--surf);
+            border: 1px solid var(--border2);
+            border-radius: var(--r);
+            padding: 20px
+        }
+
+        .setting-card h3 {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px
+        }
+
+        .setting-card p {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 14px;
+            line-height: 1.5
+        }
+
+        .setting-label {
+            font-size: 10px;
+            color: var(--muted);
+            font-family: var(--mono);
+            display: block;
+            margin-bottom: 5px
+        }
+
+        .setting-input {
+            width: 100%;
+            padding: 8px 11px;
+            background: var(--surf2);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 12px;
+            outline: none;
+            margin-bottom: 8px
+        }
+
+        .setting-input:focus {
+            border-color: var(--accent)
+        }
+
+        .slider-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px
+        }
+
+        input[type=range] {
+            flex: 1;
+            height: 4px;
+            background: var(--border2);
+            border-radius: 2px;
+            outline: none
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer
+        }
+
+        .slider-val {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--accent);
+            min-width: 36px;
+            text-align: right
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px
+        }
+
+        .toggle-row:last-child {
+            margin: 0
+        }
+
+        .toggle-label {
+            font-size: 13px;
+            color: var(--text)
+        }
+
+        .toggle {
+            position: relative;
+            width: 36px;
+            height: 20px
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0
+        }
+
+        .slider-tog {
+            position: absolute;
+            inset: 0;
+            background: var(--border2);
+            border-radius: 100px;
+            cursor: pointer;
+            transition: .25s
+        }
+
+        .slider-tog::before {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            bottom: 3px;
+            left: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: .25s
+        }
+
+        .toggle input:checked+.slider-tog {
+            background: var(--accent)
+        }
+
+        .toggle input:checked+.slider-tog::before {
+            transform: translateX(16px)
+        }
+
+        /* TOAST */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9998;
+            padding: 11px 16px;
+            border-radius: 8px;
+            background: var(--surf2);
+            border: 1px solid var(--border2);
+            font-size: 12px;
+            font-family: var(--mono);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, .5);
+            animation: toastIn .25s ease, toastOut .3s ease 2.5s forwards;
+            pointer-events: none;
+            max-width: 340px
+        }
+
+        .toast.success {
+            border-color: rgba(74, 222, 128, .3);
+            color: var(--pos)
+        }
+
+        .toast.error {
+            border-color: rgba(248, 113, 113, .3);
+            color: var(--neg)
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        @keyframes toastOut {
+            from {
+                opacity: 1
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(8px)
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="shell">
+
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div class="logo">
+                <div class="logo-icon">🧠</div>Sentiment Analyzer <span></span>
+            </div>
+            <div class="divider"></div>
+            <div class="engine-toggle">
+                <button class="eng-btn active" id="eng-naive" onclick="setEngine('naive')">NAIVE BAYES</button>
+                <button class="eng-btn" id="eng-ollama" onclick="setEngine('ollama')">OLLAMA</button>
+            </div>
+            <div class="topbar-right">
+                <div class="status-pill" id="acc-pill" style="display:none">ACC <b id="acc-val"
+                        style="color:var(--accent);margin-left:4px">—</b></div>
+            </div>
+        </header>
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="nav-grp">
+                <p class="nav-grp-label">Sidebar</p>
+                <button class="nav-item active" data-panel="analyze" onclick="nav('analyze')"><span class="ni">⬡</span>
+                    Analyze</button>
+                <button class="nav-item" data-panel="teach" onclick="nav('teach')"><span class="ni">✦</span> Teach Queue
+                    <span class="tq-badge" id="tq-badge">0</span></button>
+                <button class="nav-item" data-panel="history" onclick="nav('history')"><span class="ni">◈</span>
+                    History</button>
+                <button class="nav-item" data-panel="export" onclick="nav('export')"><span class="ni">↗</span>
+                    Export</button>
+                <button class="nav-item" data-panel="settings" onclick="nav('settings')"><span class="ni">⚙</span>
+                    Settings</button>
+            </div>
+            <div class="sidebar-stats">
+                <p>SESSION</p>
+                <div class="sstat"><span class="sstat-l">Total</span><span class="sstat-v" id="ss-tot">0</span></div>
+                <div class="sstat"><span class="sstat-l">Positive</span><span class="sstat-v pos" id="ss-pos">0</span>
+                </div>
+                <div class="sstat"><span class="sstat-l">Neutral</span><span class="sstat-v neu" id="ss-neu">0</span>
+                </div>
+                <div class="sstat"><span class="sstat-l">Negative</span><span class="sstat-v neg" id="ss-neg">0</span>
+                </div>
+                <div class="sstat" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+                    <span class="sstat-l">Taught</span><span class="sstat-v" style="color:#9067ff"
+                        id="ss-taught">0</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN -->
+        <main class="main">
+
+            <!-- ══ ANALYZE ══ -->
+            <section class="panel active" id="panel-analyze">
+                <div class="panel-head">
+                    <h2>Analyze <em>Text</em></h2>
+                    <p>Single or batch mode. Low-confidence results are flagged for teaching. Press ⌘+Enter to analyze.
+                    </p>
+                </div>
+                <div class="analyze-grid">
+                    <div class="analyze-left">
+                        <div class="term-box">
+                            <div class="term-top"><span class="tc r"></span><span class="tc y"></span><span
+                                    class="tc g"></span><span>stdin — sentiment analyzer</span></div>
+                            <textarea id="text-input"
+                                placeholder="Type or paste text here…&#10;&#10;Multiple lines = batch mode"
+                                oninput="onInput()"></textarea>
+                            <div class="term-foot">
+                                <span class="char-count" id="char-count">0 chars · 0 lines</span>
+                                <div class="btn-row">
+                                    <button class="btn btn-ghost btn-sm" onclick="clearInput()">Clear</button>
+                                    <button class="btn btn-ghost btn-sm" id="batch-btn" onclick="batchAnalyze()"
+                                        style="display:none">⚡ Batch</button>
+                                    <button class="btn btn-primary btn-sm" id="analyze-btn" onclick="analyzeText()">▶
+                                        Analyze</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Single result -->
+                        <div class="result-card" id="result-card">
+                            <div class="rc-top">
+                                <div>
+                                    <div class="rc-label">Prediction</div><span class="sent-badge"
+                                        id="rc-badge">—</span>
+                                </div>
+                                <div class="rc-conf">
+                                    <div class="conf-big" id="rc-conf">—</div>
+                                    <div class="conf-lbl">CONFIDENCE %</div>
+                                </div>
+                            </div>
+                            <div class="conf-bar-wrap">
+                                <div class="bar-meta"><span id="conf-engine-lbl">naive bayes</span><span
+                                        id="conf-thresh-lbl"></span></div>
+                                <div class="bar-track">
+                                    <div class="bar-fill" id="rc-bar"></div>
+                                </div>
+                            </div>
+                            <div class="kw-section" id="kw-section">
+                                <div class="kw-lbl">Key Signals</div>
+                                <div class="kw-chips" id="kw-chips"></div>
+                            </div>
+                            <div class="reasoning-section" id="reasoning-section"></div>
+                            <div class="teach-prompt" id="teach-prompt">
+                                <div class="teach-q">⚠ Low confidence — what is the correct label?</div>
+                                <div class="teach-options">
+                                    <button class="teach-opt" id="to-pos" onclick="selectTeachOpt('positive')">😊
+                                        Positive</button>
+                                    <button class="teach-opt" id="to-neu" onclick="selectTeachOpt('neutral')">😐
+                                        Neutral</button>
+                                    <button class="teach-opt" id="to-neg" onclick="selectTeachOpt('negative')">😞
+                                        Negative</button>
+                                    <button class="teach-opt" onclick="dismissTeach()">Skip</button>
+                                </div>
+                                <div class="teach-save-row">
+                                    <button class="btn btn-danger btn-sm" id="teach-save-btn" onclick="saveTeachLabel()"
+                                        disabled>Save &amp; Teach</button>
+                                    <span class="teach-note">Appends to dataset.csv and retrains model.</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Batch result -->
+                        <div class="batch-result" id="batch-result">
+                            <div class="batch-head">
+                                <span
+                                    style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Batch
+                                    Results</span>
+                                <span style="font-family:var(--mono);font-size:10px;color:var(--muted)"
+                                    id="batch-meta"></span>
+                            </div>
+                            <div id="batch-rows"></div>
+                        </div>
+                    </div>
+
+                    <div class="analyze-right">
+                        <!-- Model card -->
+                        <div class="model-card">
+                            <h3>Active Model <span class="model-badge" id="engine-badge">NAIVE BAYES</span></h3>
+                            <div class="model-row"><span class="model-k">Engine</span><span class="model-v"
+                                    id="mi-engine">Naive Bayes (C++)</span></div>
+                            <div class="model-row"><span class="model-k">Accuracy</span><span class="model-v"
+                                    id="mi-acc">—</span></div>
+                            <div class="model-row"><span class="model-k">Backend</span><span class="model-v"
+                                    id="mi-backend">Checking…</span></div>
+                            <div class="model-row"><span class="model-k">Teach queue</span><span class="model-v"
+                                    id="mi-tq">0 items</span></div>
+                            <div class="model-row" id="mi-dataset-row" style="display:none">
+                                <span class="model-k">Dataset rows</span><span class="model-v" id="mi-dataset">—</span>
+                            </div>
+                            <div class="ollama-picker" id="ollama-picker">
+                                <label>Ollama Model</label>
+                                <select id="ollama-model-select"
+                                    onchange="settings.ollamaModel=this.value;saveSettings();updateEngineUI()">
+                                    <option value="llama3">llama3</option>
+                                    <option value="mistral">mistral</option>
+                                    <option value="phi3">phi3</option>
+                                    <option value="gemma2">gemma2</option>
+                                    <option value="deepseek-r1">deepseek-r1</option>
+                                </select>
+                            </div>
+                            <div class="model-actions">
+                                <button class="btn btn-ghost btn-sm" onclick="retrain()">↺ Retrain</button>
+                                <button class="btn btn-ghost btn-sm" onclick="checkBackend()">↻ Reconnect</button>
+                            </div>
+                        </div>
+
+                        <!-- Mini history -->
+                        <div class="model-card" style="flex:1">
+                            <h3
+                                style="font-size:13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+                                Recent <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 8px"
+                                    onclick="nav('history')">All →</button>
+                            </h3>
+                            <div id="mini-hist">
+                                <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">No predictions
+                                    yet.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══ TEACH QUEUE ══ -->
+            <section class="panel" id="panel-teach">
+                <div class="panel-head">
+                    <h2>Teach <em>Queue</em></h2>
+                    <p>Low-confidence predictions waiting for your label. Correct them to improve the model over time.
+                    </p>
+                </div>
+                <div class="tq-controls">
+                    <button class="btn btn-ghost btn-sm" onclick="clearTeachQueue()">Clear Queue</button>
+                    <span style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto"
+                        id="tq-count-label">0 items</span>
+                </div>
+                <div id="tq-list">
+                    <div class="tq-empty">
+                        <div class="big">✦</div>Queue empty.<br>Analyze text to populate it.
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══ HISTORY ══ -->
+            <section class="panel" id="panel-history">
+                <div class="panel-head">
+                    <h2>Prediction <em>History</em></h2>
+                    <p>Full log of all predictions this session.</p>
+                </div>
+                <div class="hist-controls">
+                    <div class="search-box">
+                        <span style="color:var(--muted);font-size:13px">⌕</span>
+                        <input type="text" id="hist-search" placeholder="Search…" oninput="renderHistory()">
+                    </div>
+                    <div class="filter-row">
+                        <button class="filter-chip active" data-filter="all" onclick="setFilter('all')">All</button>
+                        <button class="filter-chip" data-filter="positive" onclick="setFilter('positive')">Pos</button>
+                        <button class="filter-chip" data-filter="neutral" onclick="setFilter('neutral')">Neu</button>
+                        <button class="filter-chip" data-filter="negative" onclick="setFilter('negative')">Neg</button>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" onclick="clearHistory()">Clear</button>
+                </div>
+                <div class="hist-table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Engine</th>
+                                <th>Sentiment</th>
+                                <th>Confidence</th>
+                                <th>Taught?</th>
+                                <th>Text</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hist-tbody"></tbody>
+                    </table>
+                </div>
+                <div id="hist-empty"
+                    style="text-align:center;padding:40px;font-family:var(--mono);font-size:12px;color:var(--muted);display:none">
+                    No results match.</div>
+            </section>
+
+            <!-- ══ EXPORT ══ -->
+            <section class="panel" id="panel-export">
+                <div class="panel-head">
+                    <h2>Export <em>Data</em></h2>
+                    <p>Download your session data.</p>
+                </div>
+                <div class="export-grid">
+                    <div class="export-card">
+                        <h3>📄 History CSV</h3>
+                        <p>All predictions. Open in Excel, Numbers, or Python.</p><button class="btn btn-ghost btn-sm"
+                            onclick="exportCSV('history')" style="margin-top:auto">↓ history.csv</button>
+                    </div>
+                    <div class="export-card">
+                        <h3>📋 History JSON</h3>
+                        <p>Structured JSON — ideal for external tools or logging.</p><button
+                            class="btn btn-ghost btn-sm" onclick="exportJSON()" style="margin-top:auto">↓
+                            history.json</button>
+                    </div>
+                    <div class="export-card">
+                        <h3>🧠 Taught Labels CSV</h3>
+                        <p>Only manually labelled items — append directly to your dataset.csv.</p><button
+                            class="btn btn-ghost btn-sm" onclick="exportCSV('taught')" style="margin-top:auto">↓
+                            taught.csv</button>
+                    </div>
+                    <div class="export-card" style="grid-column:1/-1;flex-direction:row;gap:40px;align-items:center">
+                        <div style="flex:1">
+                            <h3 style="margin-bottom:12px">Session Breakdown</h3>
+                            <div class="donut-wrap">
+                                <svg class="donut" width="90" height="90" viewBox="0 0 42 42">
+                                    <circle class="dt" cx="21" cy="21" r="15.91" />
+                                    <circle class="ds" id="d-pos" cx="21" cy="21" r="15.91" stroke="var(--pos)"
+                                        stroke-dasharray="0 100" />
+                                    <circle class="ds" id="d-neu" cx="21" cy="21" r="15.91" stroke="var(--neu)"
+                                        stroke-dasharray="0 100" />
+                                    <circle class="ds" id="d-neg" cx="21" cy="21" r="15.91" stroke="var(--neg)"
+                                        stroke-dasharray="0 100" />
+                                </svg>
+                                <div>
+                                    <div class="leg-item"><span class="leg-dot"
+                                            style="background:var(--pos)"></span>Positive — <b id="l-pos">0</b></div>
+                                    <div class="leg-item"><span class="leg-dot"
+                                            style="background:var(--neu)"></span>Neutral — <b id="l-neu">0</b></div>
+                                    <div class="leg-item"><span class="leg-dot"
+                                            style="background:var(--neg)"></span>Negative — <b id="l-neg">0</b></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══ SETTINGS ══ -->
+            <section class="panel" id="panel-settings">
+                <div class="panel-head">
+                    <h2>Settings <em>&amp; Config</em></h2>
+                    <p>Configure backends, thresholds, and behaviour.</p>
+                </div>
+                <div class="settings-grid">
+                    <div class="setting-card">
+                        <h3>C++ Backend</h3>
+                        <p>URL of your running server.cpp instance.</p>
+                        <label class="setting-label">Server URL</label>
+                        <input class="setting-input" id="set-backend-url" type="text" value="http://localhost:8080"
+                            onchange="settings.backendUrl=this.value;saveSettings();checkBackend()">
+                        <button class="btn btn-ghost btn-sm" onclick="checkBackend()">Test Connection</button>
+                    </div>
+                    <div class="setting-card">
+                        <h3>Ollama</h3>
+                        <p>URL for your local Ollama instance. Run <code
+                                style="font-family:var(--mono);font-size:11px;color:var(--accent)">ollama serve</code>
+                            first.</p>
+                        <label class="setting-label">Ollama URL</label>
+                        <input class="setting-input" id="set-ollama-url" type="text" value="http://localhost:11434"
+                            onchange="settings.ollamaUrl=this.value;saveSettings()">
+                        <label class="setting-label">Default Model</label>
+                        <input class="setting-input" id="set-ollama-model" type="text" value="llama3"
+                            onchange="settings.ollamaModel=this.value;saveSettings()">
+                    </div>
+                    <div class="setting-card">
+                        <h3>Teaching Threshold</h3>
+                        <p>Predictions below this confidence % get flagged for teaching.</p>
+                        <div class="slider-wrap">
+                            <input type="range" min="20" max="90" value="60" id="thresh-slider"
+                                oninput="updateThreshold(this.value)">
+                            <span class="slider-val" id="thresh-val">60%</span>
+                        </div>
+                    </div>
+                    <div class="setting-card">
+                        <h3>Behaviour</h3>
+                        <p>Feature toggles.</p>
+                        <div class="toggle-row"><span class="toggle-label">Auto-queue low confidence</span><label
+                                class="toggle"><input type="checkbox" id="tog-autoqueue" checked
+                                    onchange="settings.autoQueue=this.checked;saveSettings()"><span
+                                    class="slider-tog"></span></label></div>
+                        <div class="toggle-row"><span class="toggle-label">Show keyword signals</span><label
+                                class="toggle"><input type="checkbox" id="tog-keywords" checked
+                                    onchange="settings.showKeywords=this.checked;saveSettings()"><span
+                                    class="slider-tog"></span></label></div>
+                        <div class="toggle-row"><span class="toggle-label">Auto-retrain after teaching</span><label
+                                class="toggle"><input type="checkbox" id="tog-retrain" checked
+                                    onchange="settings.autoRetrain=this.checked;saveSettings()"><span
+                                    class="slider-tog"></span></label></div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        // ════════════════════════════════════════════
+        // SETTINGS
+        // ════════════════════════════════════════════
+        const DEFAULTS = {
+            backendUrl: 'http://localhost:8080', ollamaUrl: 'http://localhost:11434',
+            ollamaModel: 'llama3', threshold: 60,
+            autoQueue: true, showKeywords: true, autoRetrain: true
+        };
+        let settings = { ...DEFAULTS };
+        function saveSettings() {
+            try { sessionStorage.setItem('sa2_cfg', JSON.stringify(settings)) } catch { }
+            syncSettingsUI();
+        }
+        function loadSettings() {
+            try { Object.assign(settings, JSON.parse(sessionStorage.getItem('sa2_cfg') || '{}')) } catch { }
+            syncSettingsUI();
+        }
+        function safeJsonParse(raw, fallback = null) {
+            if (raw == null) return fallback;
+
+            if (typeof raw === "object") return raw;
+
+            const s = String(raw).trim();
+            if (!s) return fallback;
+
+            try {
+                return JSON.parse(s);
+            } catch { }
+
+            const objStart = s.indexOf("{");
+            const objEnd = s.lastIndexOf("}");
+            if (objStart !== -1 && objEnd !== -1 && objEnd > objStart) {
+                const candidate = s.slice(objStart, objEnd + 1);
+                try {
+                    return JSON.parse(candidate);
+                } catch { }
+            }
+
+            const arrStart = s.indexOf("[");
+            const arrEnd = s.lastIndexOf("]");
+            if (arrStart !== -1 && arrEnd !== -1 && arrEnd > arrStart) {
+                const candidate = s.slice(arrStart, arrEnd + 1);
+                try {
+                    return JSON.parse(candidate);
+                } catch { }
+            }
+
+            return fallback;
+        }
+
+
+        function syncSettingsUI() {
+            document.getElementById('set-backend-url').value = settings.backendUrl;
+            document.getElementById('set-ollama-url').value = settings.ollamaUrl;
+            document.getElementById('set-ollama-model').value = settings.ollamaModel;
+            document.getElementById('thresh-slider').value = settings.threshold;
+            document.getElementById('thresh-val').textContent = settings.threshold + '%';
+            document.getElementById('tog-autoqueue').checked = settings.autoQueue;
+            document.getElementById('tog-keywords').checked = settings.showKeywords;
+            document.getElementById('tog-retrain').checked = settings.autoRetrain;
+            document.getElementById('ollama-model-select').value = settings.ollamaModel;
+        }
+        function updateThreshold(v) { settings.threshold = +v; document.getElementById('thresh-val').textContent = v + '%'; saveSettings() }
+
+        // ════════════════════════════════════════════
+        // STATE
+        // ════════════════════════════════════════════
+        let engine = 'naive';
+        let backendOk = false, ollamaOk = false;
+        const history = [], teachQueue = [], taughtItems = [];
+        const counts = { positive: 0, neutral: 0, negative: 0 };
+        let histFilterActive = 'all';
+        let currentTeachText = '', currentTeachLabel = '';
+
+        // ════════════════════════════════════════════
+        // NAV
+        // ════════════════════════════════════════════
+        function nav(panel) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+            document.getElementById('panel-' + panel).classList.add('active');
+            document.querySelector(`[data-panel="${panel}"]`).classList.add('active');
+            if (panel === 'export') renderDonut();
+            if (panel === 'history') renderHistory();
+            if (panel === 'teach') renderTeachQueue();
+        }
+
+        // ════════════════════════════════════════════
+        // ENGINE
+        // ════════════════════════════════════════════
+        function setEngine(e) {
+            engine = e;
+            document.getElementById('eng-naive').classList.toggle('active', e === 'naive');
+            document.getElementById('eng-ollama').classList.toggle('active', e === 'ollama');
+            document.getElementById('ollama-picker').classList.toggle('show', e === 'ollama');
+            updateEngineUI();
+        }
+        function updateEngineUI() {
+            const isOllama = engine === 'ollama';
+            const modelName = isOllama ? `Ollama / ${settings.ollamaModel}` : 'Naive Bayes (C++)';
+            document.getElementById('engine-badge').textContent = isOllama ? 'OLLAMA' : 'NAIVE BAYES';
+            document.getElementById('engine-badge').className = 'model-badge' + (isOllama ? ' ollama-b' : '');
+            document.getElementById('mi-engine').textContent = modelName;
+            document.getElementById('conf-engine-lbl').textContent = isOllama ? `ollama · ${settings.ollamaModel}` : 'naive bayes';
+        }
+
+        // ════════════════════════════════════════════
+        // BACKEND
+        // ════════════════════════════════════════════
+        async function checkBackend() {
+            document.getElementById('mi-backend').textContent = 'Checking…';
+
+            // C++ server
+            try {
+                const r = await fetch(`${settings.backendUrl}/ping`, { signal: AbortSignal.timeout(1500) });
+                if (r.ok) {
+                    backendOk = true;
+                    document.getElementById('mi-backend').textContent = 'localhost:8080 ✓';
+                    document.getElementById('acc-pill').style.display = '';
+                    // accuracy
+                    try {
+                        const a = await fetch(`${settings.backendUrl}/accuracy`);
+                        const d = await a.json();
+                        const s = d.accuracy.toFixed(1) + '%';
+                        document.getElementById('acc-val').textContent = s;
+                        document.getElementById('mi-acc').textContent = s;
+                    } catch { }
+                    // dataset info
+                    try {
+                        const d2 = await fetch(`${settings.backendUrl}/dataset-info`);
+                        const dd = await d2.json();
+                        document.getElementById('mi-dataset').textContent = `${dd.rows} rows`;
+                        document.getElementById('mi-dataset-row').style.display = '';
+                    } catch { }
+                }
+            } catch {
+                backendOk = false;
+                document.getElementById('mi-backend').textContent = 'Not connected';
+                document.getElementById('mi-acc').textContent = 'N/A (demo)';
+            }
+
+            // Ollama
+            try {
+                const or = await fetch(`${settings.ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(1500) });
+                if (or.ok) {
+                    ollamaOk = true;
+                    const od = await or.json();
+                    if (od.models && od.models.length) {
+                        const sel = document.getElementById('ollama-model-select');
+                        sel.innerHTML = od.models.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+                        sel.value = settings.ollamaModel;
+                    }
+                }
+            } catch { ollamaOk = false }
+        }
+
+        // ════════════════════════════════════════════
+        // INPUT
+        // ════════════════════════════════════════════
+        function onInput() {
+            const v = document.getElementById('text-input').value;
+            const lines = v.split('\n').filter(l => l.trim()).length;
+            document.getElementById('char-count').textContent = `${v.length} chars · ${lines} line${lines !== 1 ? 's' : ''}`;
+            document.getElementById('batch-btn').style.display = lines > 1 ? '' : 'none';
+        }
+        function clearInput() {
+            document.getElementById('text-input').value = '';
+            document.getElementById('char-count').textContent = '0 chars · 0 lines';
+            document.getElementById('result-card').classList.remove('show');
+            document.getElementById('batch-result').classList.remove('show');
+            document.getElementById('batch-btn').style.display = 'none';
+        }
+
+        // ════════════════════════════════════════════
+        // ANALYZE — single
+        // ════════════════════════════════════════════
+        async function analyzeText() {
+            const text = document.getElementById('text-input').value.trim();
+            if (!text) return;
+            const btn = document.getElementById('analyze-btn');
+            btn.disabled = true; btn.textContent = '⟳ Analyzing…';
+            let r;
+            try {
+                if (engine === 'ollama') r = await ollamaPredict(text);
+                else if (backendOk) r = await backendPredict(text);
+                else r = demoPredict(text);
+            } catch (e) {
+                toast('Prediction error: ' + e.message, 'error');
+                btn.disabled = false; btn.innerHTML = '▶ Analyze';
+                return;
+            }
+            showResult(r.label, r.confidence, text, r.keywords || [], r.reasoning || '');
+            pushHistory(r.label, r.confidence, text, r.keywords || []);
+            btn.disabled = false; btn.innerHTML = '▶ Analyze';
+        }
+
+        // ════════════════════════════════════════════
+        // ANALYZE — batch
+        // ════════════════════════════════════════════
+        async function batchAnalyze() {
+            const lines = document.getElementById('text-input').value.split('\n').filter(l => l.trim());
+            if (lines.length < 2) { analyzeText(); return }
+            const btn = document.getElementById('analyze-btn');
+            btn.disabled = true;
+            document.getElementById('result-card').classList.remove('show');
+            const batchEl = document.getElementById('batch-result');
+            const rowsEl = document.getElementById('batch-rows');
+            batchEl.classList.add('show'); rowsEl.innerHTML = '';
+            let pos = 0, neu = 0, neg = 0, unc = 0;
+            for (let i = 0; i < lines.length; i++) {
+                const text = lines[i].trim();
+                btn.textContent = `⟳ ${i + 1}/${lines.length}`;
+                let r;
+                try {
+                    if (engine === 'ollama') r = await ollamaPredict(text);
+                    else if (backendOk) r = await backendPredict(text);
+                    else r = demoPredict(text);
+                } catch { r = demoPredict(text) }
+                if (r.label === 'positive') pos++;
+                else if (r.label === 'neutral') neu++;
+                else neg++;
+                const lowConf = r.confidence < settings.threshold;
+                if (lowConf) unc++;
+                pushHistory(r.label, r.confidence, text, r.keywords || []);
+                if (lowConf && settings.autoQueue) addToTQ(text, r.label, r.confidence);
+                const row = document.createElement('div');
+                row.className = 'batch-row';
+                row.innerHTML = `
+      <span class="bs ${lowConf ? 'uncertain' : r.label}">${lowConf ? 'uncertain' : r.label}</span>
+      <span class="batch-text">${esc(text)}</span>
+      <span class="batch-conf">${r.confidence.toFixed(1)}%</span>
+      ${lowConf ? `<button class="batch-teach-btn" onclick="quickTeach(this,'${esc(text.replace(/'/g, "\\'"))}')">teach</button>` : ''}
+    `;
+                rowsEl.appendChild(row);
+            }
+            document.getElementById('batch-meta').textContent = `${lines.length} lines · ${pos}+ ${neg}− ${neu}≈ ${unc}⚠`;
+            btn.disabled = false; btn.innerHTML = '▶ Analyze';
+        }
+
+        function quickTeach(btn, text) {
+            // Set the current teach text and jump to teach panel
+            currentTeachText = text;
+            if (!teachQueue.find(q => q.text === text)) {
+                addToTQ(text, 'uncertain', 0);
+            }
+            nav('teach');
+        }
+
+        // ════════════════════════════════════════════
+        // PREDICT BACKENDS
+        // ════════════════════════════════════════════
+        async function backendPredict(text) {
+            const resp = await fetch(`${settings.backendUrl}/predict`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            if (!resp.ok) throw new Error('Backend returned ' + resp.status);
+            const d = await resp.json();
+            if (!d.label) throw new Error('Bad response: ' + JSON.stringify(d));
+            // Normalize keywords: backend returns [{word,polarity,score}]
+            const kw = (d.keywords || []).map(k => typeof k === 'object' ? k : { word: k, polarity: 'neu' });
+            return { label: d.label, confidence: Number(d.confidence), keywords: kw, reasoning: '', isUnknown: d.isUnknown || false, oovRatio: d.oovRatio || 0 };
+        }
+
+        async function ollamaPredict(text) {
+            const prompt = `You are a sentiment analysis classifier. Analyze the following text and respond ONLY with valid JSON (no markdown, no explanation) with these exact fields:
+{"label":"positive|neutral|negative","confidence":0-100,"keywords":[{"word":"...","polarity":"pos|neg|neu"}],"reasoning":"one sentence"}
+
+Text: "${text.replace(/"/g, '\\"')}"`;
+
+            // Route through C++ server proxy to avoid CORS issues with Ollama
+            const endpoint = backendOk
+                ? `${settings.backendUrl}/ollama-proxy`
+                : `${settings.ollamaUrl}/api/generate`;
+
+            const body = backendOk
+                ? JSON.stringify({ model: settings.ollamaModel, prompt, ollamaUrl: settings.ollamaUrl })
+                : JSON.stringify({ model: settings.ollamaModel, prompt, stream: false, options: { temperature: 0.1 } });
+
+            const r = await fetch(endpoint, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body,
+                signal: AbortSignal.timeout(60000)
+            });
+            if (!r.ok) throw new Error('Ollama error: ' + r.status);
+
+            const rawText = await r.text();
+            const raw = safeJsonParse(rawText);
+            if (!raw) throw new Error('Ollama returned an empty or invalid response');
+            if (raw.error) throw new Error(raw.error);
+
+            let resp = (raw.response || '').replace(/```json|```/g, '').trim();
+            const start = resp.indexOf('{'), end = resp.lastIndexOf('}');
+            if (start !== -1 && end !== -1) resp = resp.slice(start, end + 1);
+            const d = safeJsonParse(resp);
+            if (!d || !d.label) {
+                throw new Error('Ollama did not return sentiment JSON. Response: ' + resp.slice(0, 120));
+            }
+            return { label: d.label, confidence: Number(d.confidence), keywords: d.keywords || [], reasoning: d.reasoning || '' };
+        }
+
+        // Demo fallback
+        const POS_W = new Set(['good', 'great', 'excellent', 'amazing', 'love', 'wonderful', 'fantastic', 'happy', 'best', 'awesome', 'perfect', 'brilliant', 'outstanding', 'superb', 'enjoyable', 'delightful', 'pleasant', 'glad', 'nice', 'beautiful', 'joy', 'helpful', 'recommend', 'impressive', 'pleased', 'positive', 'thrilled', 'excited', 'lovely']);
+        const NEG_W = new Set(['bad', 'terrible', 'awful', 'hate', 'worst', 'horrible', 'disgusting', 'ugly', 'poor', 'fail', 'failed', 'disappointing', 'useless', 'boring', 'dull', 'annoying', 'sad', 'wrong', 'broken', 'waste', 'pathetic', 'mediocre', 'frustrating', 'regret', 'negative', 'dreadful', 'appalling', 'unacceptable', 'trash', 'rubbish']);
+        function demoPredict(text) {
+            const tokens = text.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/);
+            let pos = 0, neg = 0; const keywords = []; let negation = false;
+            for (const w of tokens) {
+                if (['not', "don't", "didn't", "never", "no", "without"].includes(w)) { negation = true; continue }
+                const iP = POS_W.has(w), iN = NEG_W.has(w);
+                if (iP || iN) {
+                    const eP = negation ? iN : iP, eN = negation ? iP : iN;
+                    if (eP) { pos += 2; keywords.push({ word: negation ? 'not_' + w : w, polarity: 'pos' }) }
+                    if (eN) { neg += 2; keywords.push({ word: negation ? 'not_' + w : w, polarity: 'neg' }) }
+                    negation = false;
+                }
+            }
+            const total = pos + neg;
+            if (total === 0) return { label: 'neutral', confidence: 50 + Math.random() * 12, keywords: [] };
+            if (Math.abs(pos - neg) < 1.5) return { label: 'neutral', confidence: 42 + Math.random() * 14, keywords };
+            const label = pos > neg ? 'positive' : 'negative';
+            const conf = Math.min(97, Math.max(52, 50 + (Math.max(pos, neg) / total) * 50));
+            return { label, confidence: conf, keywords: keywords.slice(0, 5) };
+        }
+
+        // ════════════════════════════════════════════
+        // SHOW RESULT
+        // ════════════════════════════════════════════
+        function showResult(label, confidence, text, keywords, reasoning) {
+            document.getElementById('result-card').classList.add('show');
+            document.getElementById('batch-result').classList.remove('show');
+            const uncertain = confidence < settings.threshold;
+
+            const badge = document.getElementById('rc-badge');
+            badge.textContent = uncertain ? 'uncertain' : label;
+            badge.className = 'sent-badge ' + (uncertain ? 'uncertain' : label);
+
+            document.getElementById('rc-conf').textContent = confidence.toFixed(1);
+            document.getElementById('conf-thresh-lbl').textContent = `threshold: ${settings.threshold}%`;
+
+            const fill = document.getElementById('rc-bar');
+            fill.className = 'bar-fill ' + (uncertain ? 'uncertain' : label);
+            setTimeout(() => { fill.style.width = Math.min(100, confidence) + '%' }, 30);
+
+            // Keywords
+            const kwSec = document.getElementById('kw-section');
+            if (settings.showKeywords && keywords && keywords.length) {
+                kwSec.style.display = '';
+                document.getElementById('kw-chips').innerHTML = keywords.map(k => `<span class="kw-chip ${k.polarity}">${esc(k.word)}</span>`).join('');
+            } else { kwSec.style.display = 'none' }
+
+            // Reasoning (ollama)
+            const rSec = document.getElementById('reasoning-section');
+            if (reasoning) { rSec.textContent = `💬 ${reasoning}`; rSec.classList.add('show') }
+            else { rSec.classList.remove('show') }
+
+            // Teach prompt
+            currentTeachText = text; currentTeachLabel = '';
+            document.querySelectorAll('.teach-opt').forEach(b => { b.classList.remove('pos-sel', 'neu-sel', 'neg-sel') });
+            document.getElementById('teach-save-btn').disabled = true;
+            const tp = document.getElementById('teach-prompt');
+            if (uncertain && settings.autoQueue) {
+                tp.classList.add('show');
+                addToTQ(text, label, confidence);
+            } else { tp.classList.remove('show') }
+        }
+
+        // ════════════════════════════════════════════
+        // TEACH — inline
+        // ════════════════════════════════════════════
+        function selectTeachOpt(label) {
+            currentTeachLabel = label;
+            document.getElementById('to-pos').classList.remove('pos-sel');
+            document.getElementById('to-neu').classList.remove('neu-sel');
+            document.getElementById('to-neg').classList.remove('neg-sel');
+            const map = { positive: 'pos-sel', neutral: 'neu-sel', negative: 'neg-sel' };
+            document.getElementById('to-' + label.slice(0, 3)).classList.add(map[label]);
+            document.getElementById('teach-save-btn').disabled = false;
+        }
+        async function saveTeachLabel() {
+            if (!currentTeachLabel || !currentTeachText) return;
+            await doTeach(currentTeachText, currentTeachLabel);
+            document.getElementById('teach-prompt').classList.remove('show');
+            removeFromTQ(currentTeachText);
+            currentTeachText = ''; currentTeachLabel = '';
+        }
+        function dismissTeach() {
+            document.getElementById('teach-prompt').classList.remove('show');
+            removeFromTQ(currentTeachText);
+        }
+
+        async function doTeach(text, label) {
+            const item = { text, label, time: nowStr() };
+            taughtItems.push(item);
+            updateSsStats();
+            // Mark history row as taught
+            const h = history.find(h => h.text === text);
+            if (h) h.taught = true;
+
+            if (backendOk) {
+                try {
+                    await fetch(`${settings.backendUrl}/teach`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(item)
+                    });
+                    toast(`✓ Saved to dataset.csv as "${label}"`, 'success');
+                    if (settings.autoRetrain) await retrain();
+                } catch { toast('Saved locally only — backend not connected', 'error') }
+            } else {
+                toast(`Saved locally (connect server to persist to CSV)`, 'error');
+            }
+        }
+
+        // ════════════════════════════════════════════
+        // TEACH QUEUE
+        // ════════════════════════════════════════════
+        function addToTQ(text, predictedLabel, confidence) {
+            if (teachQueue.find(q => q.text === text)) return;
+            teachQueue.push({ text, predictedLabel, confidence, time: nowStr() });
+            updateTQBadge();
+        }
+        function removeFromTQ(text) {
+            const i = teachQueue.findIndex(q => q.text === text);
+            if (i !== -1) teachQueue.splice(i, 1);
+            updateTQBadge();
+        }
+        function updateTQBadge() {
+            const n = teachQueue.length;
+            const b = document.getElementById('tq-badge');
+            b.textContent = n; b.classList.toggle('show', n > 0);
+            document.getElementById('mi-tq').textContent = `${n} item${n !== 1 ? 's' : ''}`;
+            document.getElementById('tq-count-label').textContent = `${n} item${n !== 1 ? 's' : ''}`;
+        }
+        function renderTeachQueue() {
+            const el = document.getElementById('tq-list');
+            if (!teachQueue.length) {
+                el.innerHTML = '<div class="tq-empty"><div class="big">✦</div>Queue empty.<br>Analyze text to populate it.</div>';
+                return;
+            }
+            el.innerHTML = teachQueue.map((q, i) => `
+    <div class="tq-card" id="tqc-${i}">
+      <div class="tq-card-top">
+        <span class="bs ${q.predictedLabel}">${q.predictedLabel}</span>
+        <div class="tq-text">"${esc(q.text)}"</div>
+        <span class="tq-meta">${q.confidence.toFixed(0)}% conf · ${q.time}</span>
+      </div>
+      <div class="tq-card-foot">
+        <span>Label:</span>
+        <button class="teach-opt" onclick="labelTQItem(${i},'positive')" style="border-radius:100px">😊 Positive</button>
+        <button class="teach-opt" onclick="labelTQItem(${i},'neutral')" style="border-radius:100px">😐 Neutral</button>
+        <button class="teach-opt" onclick="labelTQItem(${i},'negative')" style="border-radius:100px">😞 Negative</button>
+        <button class="teach-opt" onclick="dismissTQItem(${i})" style="margin-left:auto;border-radius:100px">✕ Skip</button>
+      </div>
+    </div>
+  `).join('');
+        }
+        async function labelTQItem(i, label) {
+            const q = teachQueue[i];
+            await doTeach(q.text, label);
+            teachQueue.splice(i, 1);
+            updateTQBadge();
+            renderTeachQueue();
+        }
+        function dismissTQItem(i) { teachQueue.splice(i, 1); updateTQBadge(); renderTeachQueue() }
+        function clearTeachQueue() { teachQueue.length = 0; updateTQBadge(); renderTeachQueue() }
+
+        // ════════════════════════════════════════════
+        // RETRAIN
+        // ════════════════════════════════════════════
+        async function retrain() {
+            if (!backendOk) { toast('Backend not connected', 'error'); return }
+            toast('↺ Retraining…');
+            try {
+                const r = await fetch(`${settings.backendUrl}/retrain`, { method: 'POST' });
+                const d = await r.json();
+                const s = d.accuracy.toFixed(1) + '%';
+                document.getElementById('acc-val').textContent = s;
+                document.getElementById('mi-acc').textContent = s;
+                toast(`✓ Retrained — accuracy: ${s}`, 'success');
+            } catch { toast('Retrain failed', 'error') }
+        }
+
+        // ════════════════════════════════════════════
+        // HISTORY
+        // ════════════════════════════════════════════
+        function pushHistory(label, confidence, text, keywords) {
+            history.unshift({ time: nowStr(), engine, label, confidence, text, keywords, taught: false });
+            counts[label] = (counts[label] || 0) + 1;
+            updateSsStats(); renderMiniHist();
+        }
+        function updateSsStats() {
+            document.getElementById('ss-tot').textContent = history.length;
+            document.getElementById('ss-pos').textContent = counts.positive || 0;
+            document.getElementById('ss-neu').textContent = counts.neutral || 0;
+            document.getElementById('ss-neg').textContent = counts.negative || 0;
+            document.getElementById('ss-taught').textContent = taughtItems.length;
+        }
+        function renderMiniHist() {
+            const el = document.getElementById('mini-hist');
+            if (!history.length) { el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--muted)">No predictions yet.</div>'; return }
+            el.innerHTML = history.slice(0, 5).map(h => `
+    <div style="display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span class="bs ${h.label}" style="font-size:9px">${h.label}</span>
+      <span style="font-size:11px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)">${esc(h.text)}</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${h.confidence.toFixed(0)}%</span>
+    </div>`).join('');
+        }
+        function setFilter(f) {
+            histFilterActive = f;
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+            renderHistory();
+        }
+        function renderHistory() {
+            const q = document.getElementById('hist-search').value.toLowerCase();
+            const filtered = history.filter(h => {
+                const mf = histFilterActive === 'all' || h.label === histFilterActive;
+                const ms = !q || h.text.toLowerCase().includes(q);
+                return mf && ms;
+            });
+            document.getElementById('hist-empty').style.display = filtered.length ? 'none' : '';
+            document.getElementById('hist-tbody').innerHTML = filtered.map(h => `
+    <tr>
+      <td class="muted-cell" style="white-space:nowrap">${h.time}</td>
+      <td class="muted-cell">${h.engine}</td>
+      <td><span class="bs ${h.label}">${h.label}</span></td>
+      <td style="font-family:var(--mono)">${h.confidence.toFixed(1)}%</td>
+      <td class="muted-cell" style="font-family:var(--mono)">${h.taught ? '<span style="color:var(--accent2)">✓ taught</span>' : '—'}</td>
+      <td class="text-clip">${esc(h.text)}</td>
+    </tr>`).join('');
+        }
+        function clearHistory() { history.length = 0; counts.positive = counts.neutral = counts.negative = 0; updateSsStats(); renderHistory(); renderMiniHist() }
+
+        // ════════════════════════════════════════════
+        // EXPORT
+        // ════════════════════════════════════════════
+        function exportCSV(type) {
+            const items = type === 'taught' ? taughtItems : history;
+            if (!items.length) { toast('Nothing to export', 'error'); return }
+            const csv = type === 'taught'
+                ? 'text,label\n' + items.map(i => `"${esc2(i.text)}",${i.label}`).join('\n')
+                : 'time,engine,label,confidence,taught,text\n' + items.map(i => `"${i.time}",${i.engine},${i.label},${i.confidence.toFixed(1)},${i.taught},"${esc2(i.text)}"`).join('\n');
+            dl(type === 'taught' ? 'taught.csv' : 'history.csv', csv, 'text/csv');
+        }
+        function exportJSON() {
+            if (!history.length) { toast('Nothing to export', 'error'); return }
+            dl('history.json', JSON.stringify(history, null, 2), 'application/json');
+        }
+        function dl(name, content, mime) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+            a.download = name; a.click();
+        }
+
+        // ════════════════════════════════════════════
+        // DONUT
+        // ════════════════════════════════════════════
+        function renderDonut() {
+            const total = history.length || 1;
+            const p = (counts.positive || 0) / total * 100, n2 = (counts.neutral || 0) / total * 100, n = (counts.negative || 0) / total * 100;
+            let off = 0;
+            function seg(id, pct) {
+                const el = document.getElementById(id);
+                el.style.strokeDasharray = `${pct} ${100 - pct}`;
+                el.style.strokeDashoffset = -off; off += pct;
+            }
+            seg('d-pos', p); seg('d-neu', n2); seg('d-neg', n);
+            document.getElementById('l-pos').textContent = counts.positive || 0;
+            document.getElementById('l-neu').textContent = counts.neutral || 0;
+            document.getElementById('l-neg').textContent = counts.negative || 0;
+        }
+
+        // ════════════════════════════════════════════
+        // TOAST
+        // ════════════════════════════════════════════
+        function toast(msg, type = '') {
+            const t = document.createElement('div');
+            t.className = `toast ${type}`; t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        // ════════════════════════════════════════════
+        // UTILS
+        // ════════════════════════════════════════════
+        function nowStr() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }
+        function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
+        function esc2(s) { return String(s).replace(/"/g, '""') }
+
+        // ════════════════════════════════════════════
+        // KEYBOARD
+        // ════════════════════════════════════════════
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') analyzeText();
+        });
+
+        // ════════════════════════════════════════════
+        // INIT
+        // ════════════════════════════════════════════
+        loadSettings();
+        checkBackend();
+    </script>
+</body>
+
+</html>
