@@ -1,0 +1,16 @@
+# macOS metadata
+.DS_Store
+
+# Compiled C++ binaries
+app
+main
+program
+sentiment
+sentiment_ml
+server
+
+# macOS debug symbol bundles
+*.dSYM/
+
+# Temporary backup files
+*.save
