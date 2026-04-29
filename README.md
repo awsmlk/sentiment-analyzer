@@ -1,89 +1,197 @@
-# Sentiment Analyzer (C++ / OOP Project)
+# 🧠 Sentiment Analyzer (C++ / OOP Project)
 
-This project implements a sentiment analysis system in C++ using object-oriented programming and a custom Naive Bayes model. It can classify text as positive, negative, or neutral from a CSV dataset.
+## 🔍 Project Overview
+This project implements a **Sentiment Analysis System** in C++ using Object-Oriented Programming principles and a custom-built **Naive Bayes Machine Learning model**.  
+It allows users to analyze text and classify it into **Positive, Negative, or Neutral** sentiments.
 
-## Features
+> Designed as a modular, lightweight, and educational machine learning system built entirely from scratch in C++.
 
-- Sentiment classification with confidence scores
-- Naive Bayes model built from scratch
-- Tokenization, negation handling, and simple bigrams
-- CSV-based training data
-- Terminal UI
-- Local HTTP server for the web interface
-- Browser UI in `web/index.html`
-- History export to CSV
+---
 
-## Project Structure
+## ✨ Key Features
+- ✅ Sentiment classification (Positive / Negative / Neutral)
+- ✅ Naive Bayes Machine Learning model
+- ✅ Custom tokenization and vocabulary building
+- ✅ Training from CSV dataset
+- ✅ Interactive terminal-based UI
+- ✅ History tracking of analyzed inputs
+- ✅ CSV export of results
+- ✅ Modular OOP-based structure
+- ✅ No external libraries required
 
-```text
-sentiment-analyzer/
-├── include/          Header files for all C++ classes
-├── src/              C++ implementation files
-├── web/              Browser frontend
-├── data/             Training dataset
-├── history/          Exported prediction history
-├── .vscode/          VS Code build/debug config
-├── .gitignore
-└── README.md
+---
+
+## 🌐 System Architecture
+
+    +----------------------+
+    |      User Input      |
+    +----------+-----------+
+               |
+               v
+    +----------------------+
+    |   Text Processing    |
+    | (Tokenization)       |
+    +----------+-----------+
+               |
+               v
+    +----------------------+
+    |  Naive Bayes Model   |
+    |  (Training + Predict)|
+    +----------+-----------+
+               |
+               v
+    +----------------------+
+    |   Sentiment Output   |
+    +----------+-----------+
+               |
+               v
+    +----------------------+
+    |   History Storage    |
+    +----------------------+
+
+---
+
+## 🛠️ Technologies Used
+
+- C++
+- Object-Oriented Programming (OOP)
+- Standard Template Library (STL)
+- File Handling (CSV)
+- Machine Learning (Naive Bayes)
+
+---
+
+## 📂 Project Structure
+
+```mermaid
+graph LR
+    A[Sentiment-Analyzer/] --> A1[README.md]
+    A --> A2[src/]
+    A2 --> A21[main.cpp]
+    A2 --> A22[ui.cpp]
+    A2 --> A23[sentiment.cpp]
+    A2 --> A24[server.cpp]
+
+    A --> A3[include/]
+    A3 --> A31[header files]
+
+    A --> A4[web/]
+    A4 --> A41[index.html]
+
+    A --> B[data/]
+    B --> B1[dataset.csv]
+
+    A --> C[history/]
+    C --> C1[history.csv]
+
+    A --> D[.vscode/]
 ```
+---
 
-Important files:
+## ⚙️ Requirements
+- C++17 or higher
+- g++ compiler (MinGW / GCC / Clang)
+- No external libraries required
 
-```text
-include/sentiment.h         Public sentiment API
-include/sentiment_system.h  Main class that connects the engine pieces
-src/sentiment.cpp           Sentiment engine implementations
-src/ui.cpp                  Terminal UI
-src/server.cpp              HTTP backend for the web app
-web/index.html              Web interface
-data/dataset.csv            Training data
+---
+
+## ⚙️ Compilation
 ```
-
-## Build
-
-Terminal app:
-
-```bash
-g++ -std=c++17 -O2 -Iinclude -o sentiment src/main.cpp src/ui.cpp src/sentiment.cpp
+    g++ -std=c++17 -O2 -Iinclude -o sentiment src/main.cpp src/ui.cpp src/sentiment.cpp
 ```
+---
 
-Web backend server:
-
-```bash
-g++ -std=c++17 -O2 -Iinclude -o server src/server.cpp src/sentiment.cpp -pthread
+## 🚀 Execution
 ```
-
-## Run
-
-Terminal app:
-
-```bash
-./sentiment
+    ./sentiment
 ```
+---
 
-Web app:
-
-```bash
-./server
+## 📊 Dataset Format
 ```
-
-Then open:
-
-```text
-web/index.html
+    text,label
+    I love this product,pos
+    This is terrible,neg
+    It is okay,neu
 ```
+---
 
-The web UI expects the backend at `http://localhost:8080`.
+## 🤖 Machine Learning Details
 
-## Dataset Format
+### Naive Bayes Model
+- Uses probabilistic classification
+- Applies Laplace smoothing
+- Computes prior and conditional probabilities
 
-```csv
-text,label
-I love this product,positive
-This is terrible,negative
-It is okay,neutral
+### Formula:
 ```
+    P(label | text) ∝ P(label) × Π P(word | label)
+```
+- Log probabilities are used to prevent underflow.
 
-## Notes
+---
 
-The project is intentionally lightweight and educational. It demonstrates OOP design, file handling, tokenization, model training, prediction, and a simple local server without external C++ libraries.
+## 🔄 Workflow
+
+1. Load dataset from CSV file  
+2. Train model (build vocabulary + probabilities)  
+3. Take user input  
+4. Tokenize input text  
+5. Predict sentiment using Naive Bayes  
+6. Store result in history  
+7. Export results if needed  
+
+---
+
+## 📁 History & Export
+
+- All analyzed inputs are stored during runtime  
+- Export command saves data to:
+```
+    history/history.csv
+```
+---
+
+## ⚠️ Limitations
+
+- Does not handle sarcasm or complex language  
+- Limited vocabulary compared to real NLP systems  
+- Accuracy depends on dataset quality  
+- No deep learning or contextual understanding  
+
+---
+
+## 🔮 Future Enhancements
+
+- 🤖 Integration with local AI models (e.g., Ollama)  
+- 🧠 Self-learning system (user feedback → dataset update)  
+- 🔄 Automatic retraining of model  
+- 📈 Improved confidence scoring system  
+- 🌍 Multi-language support  
+- 📊 Data visualization (graphs & charts)  
+- 🖥️ GUI-based interface  
+- 🌐 API or web-based deployment  
+
+---
+
+## 👥 Users
+
+- Students and learners of Machine Learning  
+- Developers experimenting with NLP  
+- Researchers  
+- General users
+
+## 👨‍💻 Team Members
+
+- Muhammad Awais Malik
+- Salman Faisal
+
+---
+
+## ⭐ Notes
+
+This project demonstrates how Machine Learning concepts like Naive Bayes can be implemented from scratch using C++ and OOP principles.
+
+---
+
+> ⚠️ This project is developed for academic purposes and demonstrates the application of OOP concepts in building an intelligent system.
