@@ -1,6 +1,6 @@
 // server.cpp — HTTP bridge: web frontend ↔ sentiment engine + Ollama proxy
 //
-// Compile:  g++ -std=c++17 -O2 -o server server.cpp sentiment.cpp -pthread
+// Compile:  g++ -std=c++17 -O2 -Iinclude -o server src/server.cpp src/sentiment.cpp -pthread
 // Run:      ./server
 //
 // Endpoints:

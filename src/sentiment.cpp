@@ -15,7 +15,7 @@ using namespace std;
     sentiment engine is easier to find. The implementations stay here so the
     build command can remain simple:
 
-        g++ -std=c++17 -O2 -o server server.cpp sentiment.cpp -pthread
+        g++ -std=c++17 -O2 -Iinclude -o server src/server.cpp src/sentiment.cpp -pthread
 */
 
 TrainingExample::TrainingExample() {}

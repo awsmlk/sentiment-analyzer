@@ -7,7 +7,7 @@
       "request": "launch",
       "program": "${workspaceFolder}/program",
       "args": [],
-      "cwd": "${fileDirname}",
+      "cwd": "${workspaceFolder}",
       "MIMode": "lldb",
       "preLaunchTask": "C++: build project",
       "externalConsole": true,
@@ -18,8 +18,8 @@
       "type": "lldb",
       "request": "launch",
       "args": [],
-      "cwd": "/Users/malik/Desktop/sen-analyzer",
-      "program": "/Users/malik/Desktop/sen-analyzer/build/Debug/outDebug"
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/program"
     }
   ]
 }

@@ -8,6 +8,7 @@ program
 sentiment
 sentiment_ml
 server
+/build/
 
 # macOS debug symbol bundles
 *.dSYM/

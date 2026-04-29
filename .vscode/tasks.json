@@ -8,9 +8,10 @@
       "args": [
         "-std=c++17",
         "-g",
-        "main.cpp",
-        "ui.cpp",
-        "sentiment.cpp",
+        "-Iinclude",
+        "src/main.cpp",
+        "src/ui.cpp",
+        "src/sentiment.cpp",
         "-o",
         "program"
       ],
@@ -18,6 +19,23 @@
         "kind": "build",
         "isDefault": true
       },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "C++: build server",
+      "type": "shell",
+      "command": "/usr/bin/clang++",
+      "args": [
+        "-std=c++17",
+        "-g",
+        "-Iinclude",
+        "src/server.cpp",
+        "src/sentiment.cpp",
+        "-pthread",
+        "-o",
+        "server"
+      ],
+      "group": "build",
       "problemMatcher": ["$gcc"]
     }
   ]
