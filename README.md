@@ -1,7 +1,7 @@
 # 🧠 Sentiment Analyzer (C++ / OOP Project)
 
 ## 🔍 Project Overview
-This project implements a **Sentiment Analysis System** in C++ using Object-Oriented Programming principles and a custom-built **Naive Bayes Machine Learning model**.  
+This project implements a **Sentiment Analysis System** in C++ using OOP principles and a custom-built **Naive Bayes Machine Learning model**.  
 It allows users to analyze text and classify it into **Positive, Negative, or Neutral** sentiments through both a terminal interface and a modern web application.
 
 The system includes a REST API server for programmatic access, AI integration via Ollama for enhanced analysis, and self-learning capabilities through user feedback and automatic retraining.
