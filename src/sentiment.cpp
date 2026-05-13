@@ -100,9 +100,8 @@ string WordCleaner::normalize(const string &word) const // Normalize common cont
 
 string WordCleaner::clean(string word) const // Clean the word by applying lowercase conversion, punctuation removal, and normalization in sequence to prepare it for tokenization and model training/prediction
 {
-    word = toLower(word); // Convert the word to lowercase to ensure consistency in the model's vocabulary
-    word = removePunctuation(word); // Remove punctuation to focus on the core word content and reduce noise in the model
-    word = normalize(word); // Normalize common contractions to their base forms to improve the model's ability to learn from different variations of the same word
+    word = toLower(word);
+    word = normalize(word);
     return word;
 }
 
@@ -118,16 +117,15 @@ vector<string> Tokenizer::tokenize(const string &text) const // Tokenize the inp
         currentWord = cleaner.clean(currentWord); // Clean the current word using the WordCleaner, which applies lowercase conversion, punctuation removal, and normalization to prepare the word for tokenization and model training/prediction.
         if (currentWord.empty()) continue; // If the cleaned word is empty (which can happen if the original word was just punctuation), we skip it and move on to the next word in the input text.
 
-        // Convert "not good" into one stronger token: "not_good".
-        if (previousWord == "not") // If the previous word was "not", we want to combine it with the current word to create a stronger token that captures the negation. For example, if the input text contains "not good", we want to create a token "not_good" that represents the negated sentiment more effectively than treating "not" and "good" as separate tokens.
-        {
-            words.pop_back(); // Remove the previous "not" token from the list of words, since we are going to combine it with the current word to create a new token. This ensures that we don't have both "not" and "not_good" in the list of tokens, which would be redundant.
-            currentWord = "not_" + currentWord; // Combine "not" with the current word to create a new token. For example, if the current word is "good", we create the token "not_good". This helps the model learn that "not good" has a different sentiment than just "good".
+        // If the previous word was "not", we want to combine it with the current word to create a stronger token that captures the negation. For example, if the input text contains "not good", we want to create a token "not_good" that represents the negated sentiment more effectively than treating "not" and "good" as separate tokens.
+        if (previousWord == "not") {
+            words.pop_back();
+            currentWord = "not_" + currentWord;
         }
 
         // Also store simple word pairs, like "very_good".
-        if (!previousWord.empty() && previousWord != "not") // If there is a previous word and it is not "not", we also want to create a combined token for the pair of words. For example, if the input text contains "very good", we want to create a token "very_good" that captures the sentiment of the phrase more effectively than treating "very" and "good" as separate tokens.
-            words.push_back(previousWord + "_" + currentWord); // Combine the previous word with the current word to create a new token. For example, if the previous word is "very" and the current word is "good", we create the token "very_good". This helps the model learn that "very good" has a stronger positive sentiment than just "good".
+        if (!previousWord.empty() && previousWord != "not") 
+            words.push_back(previousWord + "_" + currentWord);
 
         words.push_back(currentWord); // Add the current word (which may have been modified to include "not_" or combined with the previous word) to the list of tokens. This ensures that we still include the individual words in the token list, in addition to any combined tokens we may have created.
         previousWord = currentWord; // Update the previousWord variable to the current word for the next iteration of the loop. This allows us to check for negations and create combined tokens in the next iteration when we process the next word in the input text.
@@ -159,7 +157,7 @@ void SentimentModel::learnFromTokens(const string &label, const vector<string> &
 
 void SentimentModel::calculatePriors() // Calculate the prior probabilities for each label based on the label counts. This function is called after training to compute the priors, which represent the overall probability of each label in the training data. The priors are used during prediction to help determine the most likely label for a given input text based on the learned word counts and the overall distribution of labels in the training data.
 {
-    int totalDocuments = 0; // First, we calculate the total number of documents (training examples) by summing up the counts of all labels. This gives us the total number of examples that were used for training, which is necessary to compute the prior probabilities for each label.
+    int totalDocuments = 0;
     for (const auto &item : labelCounts) // Iterate through the labelCounts map, where each item is a pair of label and its count. We add up the counts of all labels to get the total number of documents in the training data.
         totalDocuments += item.second; // The second element of the pair (item.second) is the count of examples for that label, and we add it to the totalDocuments variable.
 
@@ -435,24 +433,22 @@ PredictResult SentimentSystem::predictFull(const string &text, bool saveToHistor
     result.oovRatio = oovChecker.calculateRatio(model, words); // Calculate the OutOfVocabulary (OOV) ratio for the input words using the OovChecker. The OOV ratio represents the proportion of words in the input text that were not seen during training and are not present in the model's vocabulary. This ratio can provide insights into how much of the input text is unfamiliar to the model, which can affect the confidence and reliability of the sentiment prediction. A high OOV ratio may indicate that the model is less confident in its prediction due to a lack of familiarity with the input words.
 
     ScoreBoard scores = predictor.scoreText(model, words); // Use the BayesPredictor to calculate the scores for each label based on the input words and the trained SentimentModel. The scoreText function will return a ScoreBoard containing the log probabilities for each label, which can be used to determine the best label and calculate confidence during prediction. The scores in the ScoreBoard will be used to set the predicted label and confidence in the PredictResult.
-    result.label = scores.bestLabel(); // Set the predicted label in the PredictResult to be the best label from the ScoreBoard, which is the label with the highest log score based on the input words and the trained SentimentModel. This represents the model's prediction for the sentiment of the input text based on its learned information from training.
-    result.confidence = scores.confidence(); // Set the confidence in the PredictResult to be the confidence calculated from the ScoreBoard, which represents how confident the model is in its prediction for the best label based on the scores for each label. The confidence value is calculated using a method that considers the relative scores of all labels to determine how strongly the model favors the predicted label over the others.
-
-    if (result.confidence < 40.0) // If the confidence of the prediction is below a certain threshold (in this case, 40.0), we set the predicted label to "neutral" to indicate that the model is not confident enough in its prediction to assign a specific sentiment label. This is a way to handle cases where the model's prediction is uncertain, and it allows us to provide a more cautious result by categorizing it as neutral rather than potentially making an incorrect positive or negative prediction.
-        result.label = "neutral"; // If the confidence is low, we set the label to "neutral" to indicate that the model is not confident in its prediction. This helps to avoid making potentially incorrect predictions when the model is uncertain about the sentiment of the input text.
+    result.label = scores.bestLabel();
+    result.confidence = scores.confidence();
+    if (result.confidence < 40.0) // If the confidence of the prediction is below a certain threshold (40.0), we set the predicted label to "neutral" to indicate that the model is not confident enough in its prediction to assign a specific sentiment label. This is a way to handle cases where the model's prediction is uncertain, and it allows us to provide a more cautious result by categorizing it as neutral rather than potentially making an incorrect positive or negative prediction.
+        result.label = "neutral";
 
     result.keywords = keywordFinder.findKeywords(model, words); // Use the KeywordFinder to identify the most influential keywords in the input text based on their contribution to the sentiment prediction. The findKeywords function will return a vector of KeywordScore objects that include the word, its polarity score, and its assigned polarity (positive, negative, or neutral) based on predefined thresholds. These keywords can provide insights into which words in the input text are driving the positive or negative sentiment in the prediction.
-    result.isUnknown = (result.oovRatio > 0.6 && result.confidence < 70.0); // Set the isUnknown flag in the PredictResult to true if the OOV ratio is greater than 0.6 and the confidence is less than 70.0. This indicates that the model considers this prediction to be uncertain or potentially unreliable due to a high proportion of unfamiliar words and a relatively low confidence score. This flag can be used by the caller to handle such cases differently, such as by providing a warning to the user or treating the result with caution.
+    result.isUnknown = (result.oovRatio > 0.6 && result.confidence < 70.0); // This indicates that the model considers this prediction to be uncertain or potentially unreliable due to a high proportion of unfamiliar words and a relatively low confidence score. This flag can be used by the caller to handle such cases differently, such as by providing a warning to the user or treating the result with caution.
 
     if (saveToHistory) // If the saveToHistory flag is true, we add this prediction to the history using the HistoryManager. We call the add function with the input text, the predicted label, and the confidence of the prediction, which will create a new entry in the history of predictions. This allows us to keep a record of all predictions made by the SentimentSystem, which can be useful for later review or analysis.
-        history.add(text, result.label, result.confidence); // Add the current prediction to the history by calling the add function of the HistoryManager with the input text, the predicted label, and the confidence of the prediction. This will create a new entry in the history of predictions, allowing us to keep a record of all predictions made by the SentimentSystem for later review or analysis.
-
+        history.add(text, result.label, result.confidence);
     return result;
 }
 
 double SentimentSystem::testAccuracy(const string &filename) // Test the accuracy of the SentimentSystem using a dataset from a specified CSV file. This function delegates the testing process to the AccuracyTester, which will read the test data from the file, make predictions using the SentimentSystem, and calculate the accuracy based on how many predictions were correct compared to the actual labels in the test data. The resulting accuracy is returned as a percentage.
 {
-    return accuracyTester.test(filename, *this); // passing in the filename of the test dataset and a reference to the current SentimentSystem.
+    return accuracyTester.test(filename, *this);
 }
 
 vector<HistoryRow>& SentimentSystem::getHistory() // Return a reference to the vector of HistoryRow objects that represents the history of predictions made by the SentimentSystem. This allows other parts of the program, such as the SentimentSystem itself or the HistoryExporter, to access and manipulate the history of predictions as needed, such as displaying it to the user or exporting it to a CSV file.
