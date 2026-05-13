@@ -544,7 +544,7 @@ int main()
     const int    port    = 8080;
 
     cout << "╔══════════════════════════════════════╗\n";
-    cout << "║   Sentiment Analyzer Server  v2      ║\n";
+    cout << "║   Sentiment Analyzer Server  v4      ║\n";
     cout << "╚══════════════════════════════════════╝\n\n";
 
     cout << "Training on " << dataset << "…\n";
