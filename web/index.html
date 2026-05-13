@@ -1509,8 +1509,8 @@
                                 <span class="char-count" id="char-count">0 chars · 0 lines</span>
                                 <div class="btn-row">
                                     <button class="btn btn-ghost btn-sm" onclick="clearInput()">Clear</button>
-                                    <button class="btn btn-ghost btn-sm" id="batch-btn" onclick="batchAnalyze()"
-                                        style="display:none">⚡ Batch</button>
+                                    <input type="file" id="file-input" accept=".txt,.csv,.md,.json" style="display:none" onchange="handleFileUpload(event)">
+                                    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('file-input').click()">Upload File</button>
                                     <button class="btn btn-primary btn-sm" id="analyze-btn" onclick="analyzeText()">▶
                                         Analyze</button>
                                 </div>
@@ -1952,14 +1952,47 @@
             const v = document.getElementById('text-input').value;
             const lines = v.split('\n').filter(l => l.trim()).length;
             document.getElementById('char-count').textContent = `${v.length} chars · ${lines} line${lines !== 1 ? 's' : ''}`;
-            document.getElementById('batch-btn').style.display = lines > 1 ? '' : 'none';
         }
         function clearInput() {
             document.getElementById('text-input').value = '';
             document.getElementById('char-count').textContent = '0 chars · 0 lines';
             document.getElementById('result-card').classList.remove('show');
             document.getElementById('batch-result').classList.remove('show');
-            document.getElementById('batch-btn').style.display = 'none';
+        }
+
+        // ════════════════════════════════════════════
+        // FILE UPLOAD
+        // ════════════════════════════════════════════
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // Check file size (limit to 10MB)
+            const maxSize = 10 * 1024 * 1024;
+            if (file.size > maxSize) {
+                toast('File too large (max 10MB)', 'error');
+                return;
+            }
+            
+            // Read the file
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = e.target.result;
+                    document.getElementById('text-input').value = content;
+                    onInput();
+                    toast(`✓ Loaded ${file.name} (${(file.size / 1024).toFixed(1)} KB)`, 'success');
+                } catch (err) {
+                    toast('Error reading file: ' + err.message, 'error');
+                }
+            };
+            reader.onerror = () => {
+                toast('Error reading file', 'error');
+            };
+            reader.readAsText(file);
+            
+            // Reset file input so the same file can be uploaded again
+            event.target.value = '';
         }
 
         // ════════════════════════════════════════════
@@ -1968,6 +2001,14 @@
         async function analyzeText() {
             const text = document.getElementById('text-input').value.trim();
             if (!text) return;
+            
+            // Check if multiple lines - if so, run batch mode automatically
+            const lines = document.getElementById('text-input').value.split('\n').filter(l => l.trim());
+            if (lines.length > 1) {
+                batchAnalyze();
+                return;
+            }
+            
             const btn = document.getElementById('analyze-btn');
             btn.disabled = true; btn.textContent = '⟳ Analyzing…';
             let r;
