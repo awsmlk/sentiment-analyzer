@@ -43,7 +43,7 @@ The system includes a REST API server for programmatic access, AI integration vi
                v
     +----------------------+
     |   Text Processing    |
-    | (Tokenization/Cleaning|
+    |    (Tokenization)    |
     +----------+-----------+
                |
                v
