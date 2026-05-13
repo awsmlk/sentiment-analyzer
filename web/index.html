@@ -185,7 +185,7 @@
         }
 
         .nav-grp-label {
-            font-family: var(--mono);
+            font-family: var(--ui);
             font-size: 9px;
             letter-spacing: .18em;
             text-transform: uppercase;
@@ -259,7 +259,7 @@
         }
 
         .sidebar-stats p {
-            font-family: var(--mono);
+            font-family: var(--ui);
             font-size: 9px;
             color: var(--muted);
             letter-spacing: .1em;
@@ -548,7 +548,7 @@
         }
 
         .rc-label {
-            font-family: var(--mono);
+            font-family: var(--ui);
             font-size: 9px;
             letter-spacing: .14em;
             text-transform: uppercase;
@@ -609,7 +609,7 @@
         .conf-lbl {
             font-size: 10px;
             color: var(--muted);
-            font-family: var(--mono)
+            font-family: var(--ui)
         }
 
         .conf-bar-wrap {
@@ -665,7 +665,7 @@
         }
 
         .kw-lbl {
-            font-family: var(--mono);
+            font-family: var(--ui);
             font-size: 9px;
             letter-spacing: .12em;
             text-transform: uppercase;
@@ -786,7 +786,7 @@
         .teach-note {
             font-size: 10px;
             color: var(--muted);
-            font-family: var(--mono)
+            font-family: var(--ui)
         }
 
         /* MODEL CARD */
@@ -1269,7 +1269,7 @@
         .setting-label {
             font-size: 10px;
             color: var(--muted);
-            font-family: var(--mono);
+            font-family: var(--ui);
             display: block;
             margin-bottom: 5px
         }
@@ -1494,14 +1494,14 @@
             <section class="panel active" id="panel-analyze">
                 <div class="panel-head">
                     <h2>Analyze <em>Text</em></h2>
-                    <p>Single or batch mode. Low-confidence results are flagged for teaching. Press ⌘+Enter to analyze.
+                    <p>Low-confidence results are flagged for teaching. Press ⌘+Enter to analyze.
                     </p>
                 </div>
                 <div class="analyze-grid">
                     <div class="analyze-left">
                         <div class="term-box">
                             <div class="term-top"><span class="tc r"></span><span class="tc y"></span><span
-                                    class="tc g"></span><span>stdin — sentiment analyzer</span></div>
+                                    class="tc g"></span><span>stdin: sentiment analyzer</span></div>
                             <textarea id="text-input"
                                 placeholder="Type or paste text here…&#10;&#10;Multiple lines = batch mode"
                                 oninput="onInput()"></textarea>
@@ -1542,7 +1542,7 @@
                             </div>
                             <div class="reasoning-section" id="reasoning-section"></div>
                             <div class="teach-prompt" id="teach-prompt">
-                                <div class="teach-q">⚠ Low confidence — what is the correct label?</div>
+                                <div class="teach-q">⚠ Low confidence: what is the correct label?</div>
                                 <div class="teach-options">
                                     <button class="teach-opt" id="to-pos" onclick="selectTeachOpt('positive')">😊
                                         Positive</button>
@@ -1907,13 +1907,11 @@
                 if (r.ok) {
                     backendOk = true;
                     document.getElementById('mi-backend').textContent = 'localhost:8080 ✓';
-                    document.getElementById('acc-pill').style.display = '';
                     // accuracy
                     try {
                         const a = await fetch(`${settings.backendUrl}/accuracy`);
                         const d = await a.json();
                         const s = d.accuracy.toFixed(1) + '%';
-                        document.getElementById('acc-val').textContent = s;
                         document.getElementById('mi-acc').textContent = s;
                     } catch { }
                     // dataset info
@@ -2039,6 +2037,9 @@
             const rowsEl = document.getElementById('batch-rows');
             batchEl.classList.add('show'); rowsEl.innerHTML = '';
             let pos = 0, neu = 0, neg = 0, unc = 0;
+            let totalConf = 0;
+            const results = [];
+            
             for (let i = 0; i < lines.length; i++) {
                 const text = lines[i].trim();
                 btn.textContent = `⟳ ${i + 1}/${lines.length}`;
@@ -2053,18 +2054,78 @@
                 else neg++;
                 const lowConf = r.confidence < settings.threshold;
                 if (lowConf) unc++;
+                totalConf += r.confidence;
+                results.push({ text, ...r, lowConf });
                 pushHistory(r.label, r.confidence, text, r.keywords || []);
                 if (lowConf && settings.autoQueue) addToTQ(text, r.label, r.confidence);
+            }
+            
+            // Calculate percentages
+            const total = lines.length;
+            const posPercent = ((pos / total) * 100).toFixed(1);
+            const neuPercent = ((neu / total) * 100).toFixed(1);
+            const negPercent = ((neg / total) * 100).toFixed(1);
+            const avgConf = (totalConf / total).toFixed(1);
+            
+            // Determine overall sentiment
+            let overallLabel = 'neutral';
+            if (pos > neu && pos > neg) overallLabel = 'positive';
+            else if (neg > neu && neg > pos) overallLabel = 'negative';
+            
+            // Add summary card at top
+            const summaryCard = document.createElement('div');
+            summaryCard.className = 'result-card show' ;
+            summaryCard.style.marginBottom = '16px';
+            summaryCard.innerHTML = `
+                <div class="rc-top">
+                    <div>
+                        <div class="rc-label">Batch Summary</div>
+                        <span class="sent-badge ${overallLabel}">${overallLabel}</span>
+                    </div>
+                    <div class="rc-conf">
+                        <div class="conf-big">${avgConf}%</div>
+                        <div class="conf-lbl">AVG CONFIDENCE</div>
+                    </div>
+                </div>
+                <div class="conf-bar-wrap">
+                    <div class="bar-meta"><span>${total} items analyzed</span></div>
+                    <div style="padding: 12px 20px;">
+                        <div style="display:flex;gap:16px;font-family:var(--mono);font-size:12px">
+                            <div>
+                                <div style="color:var(--pos);font-weight:700;font-size:16px">${pos}</div>
+                                <div style="color:var(--muted);font-size:10px">Positive (${posPercent}%)</div>
+                            </div>
+                            <div>
+                                <div style="color:var(--neu);font-weight:700;font-size:16px">${neu}</div>
+                                <div style="color:var(--muted);font-size:10px">Neutral (${neuPercent}%)</div>
+                            </div>
+                            <div>
+                                <div style="color:var(--neg);font-weight:700;font-size:16px">${neg}</div>
+                                <div style="color:var(--muted);font-size:10px">Negative (${negPercent}%)</div>
+                            </div>
+                            ${unc > 0 ? `<div>
+                                <div style="color:var(--accent2);font-weight:700;font-size:16px">${unc}</div>
+                                <div style="color:var(--muted);font-size:10px">Low Conf.</div>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            rowsEl.appendChild(summaryCard);
+            
+            // Add individual rows
+            for (const r of results) {
                 const row = document.createElement('div');
                 row.className = 'batch-row';
                 row.innerHTML = `
-      <span class="bs ${lowConf ? 'uncertain' : r.label}">${lowConf ? 'uncertain' : r.label}</span>
-      <span class="batch-text">${esc(text)}</span>
+      <span class="bs ${r.lowConf ? 'uncertain' : r.label}">${r.lowConf ? 'uncertain' : r.label}</span>
+      <span class="batch-text">${esc(r.text)}</span>
       <span class="batch-conf">${r.confidence.toFixed(1)}%</span>
-      ${lowConf ? `<button class="batch-teach-btn" onclick="quickTeach(this,'${esc(text.replace(/'/g, "\\'"))}')">teach</button>` : ''}
+      ${r.lowConf ? `<button class="batch-teach-btn" onclick="quickTeach(this,'${esc(r.text.replace(/'/g, "\\'"))}')">teach</button>` : ''}
     `;
                 rowsEl.appendChild(row);
             }
+            
             document.getElementById('batch-meta').textContent = `${lines.length} lines · ${pos}+ ${neg}− ${neu}≈ ${unc}⚠`;
             btn.disabled = false; btn.innerHTML = '▶ Analyze';
         }
