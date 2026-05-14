@@ -19,7 +19,7 @@ using namespace std;
 void menu()
 {
     cout << "\n==============================\n";
-    cout << BOLD " Sentiment Analyzer  v2\n" RESET;
+    cout << BOLD " Sentiment Analyzer \n" RESET;
     cout << "==============================\n";
     cout << "1  Analyze Text\n";
     cout << "2  Show History\n";
